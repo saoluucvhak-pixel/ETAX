@@ -333,18 +333,26 @@ export const exportReportPdf = (title, html, opts) => printToPdf(title, `<h1>${e
  * @returns {Promise<{ok:number, fail:number, total:number}>}
  */
 export async function exportInvoiceFilesPdf(invoices, { onProgress } = {}) {
-  const lib = await loadPdfLib();
+  const useElectronPrint = isElectron() && !!state.settings.saveFolderName;
+  const lib = useElectronPrint ? null : await loadPdfLib();
   const used = new Set();
   let ok = 0, fail = 0;
   for (const inv of invoices) {
     try {
-      const doc = newDoc(lib);
-      drawInvoicePdf(doc, inv, { fmtMoney, fmtDate, TAX_RATE_LABEL, INVOICE_STATUS });
       let base = sanitizeFileName(invoiceFileName(inv));
       let name = `${base}.pdf`;
       for (let i = 2; used.has(name); i++) name = `${base}_${i}.pdf`;
       used.add(name);
-      await deliver(name, doc.output('blob'), 'PDF', { invoiceKey: inv.key }, true);
+      if (useElectronPrint) {
+        const html = wrapHtml(base, invoiceHtml(inv), false);
+        const r = await desktop().printPdf({ html, name, landscape: false });
+        if (!r?.path) throw new Error('Đã hủy lưu tệp');
+        await logger.info('export', `Xuất PDF: ${name}`, { invoiceKey: inv.key, file: name });
+      } else {
+        const doc = newDoc(lib);
+        drawInvoicePdf(doc, inv, { fmtMoney, fmtDate, TAX_RATE_LABEL, INVOICE_STATUS });
+        await deliver(name, doc.output('blob'), 'PDF', { invoiceKey: inv.key }, true);
+      }
       ok++;
     } catch (e) {
       fail++;
