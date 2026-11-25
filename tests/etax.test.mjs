@@ -14,7 +14,7 @@ import {
   pool,
   toCsv,
 } from '../js/utils.js';
-import { DEFAULT_SETTINGS } from '../js/config.js';
+import { APP, DEFAULT_SETTINGS } from '../js/config.js';
 import { state } from '../js/core/state.js';
 import { GdtClient } from '../js/api.js';
 import * as syncEngine from '../js/core/syncEngine.js';
@@ -221,4 +221,8 @@ test('extension/manifest.json: valid MV3 manifest targeting gdt portal and 127.0
   assert.ok(mf.host_permissions.includes('https://hoadondientu.gdt.gov.vn/*'));
   assert.ok(mf.host_permissions.includes('http://127.0.0.1:8080/*'));
   assert.deepEqual(mf.content_scripts?.[0]?.js, ['content.js']);
+
+  const pkg = JSON.parse(await readFile(path.join(ROOT, 'package.json'), 'utf8'));
+  assert.equal(APP.version, pkg.version);
+  assert.equal(mf.version, pkg.version);
 });
