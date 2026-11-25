@@ -113,12 +113,18 @@ export async function mount(host) {
 
   function showResult(r) {
     const cell = (v, l) => h('div', h('b', fmtInt(v)), h('span', l));
-    const errList = r.errors?.length ? h('div.notice.warn', { style: { marginTop: '10px', alignItems: 'flex-start' } }, icon('alert', 18), h('div',
-      h('div', `${r.errors.length} hóa đơn không tải được chi tiết (có thể mở từng hóa đơn để tải lại):`),
+    const isGeneralErr = (err) => /bỏ qua|cổng bận|máy tính tiền|kết nối|phiên|hết hạn/i.test(err);
+    const generalErrs = (r.errors || []).filter(isGeneralErr);
+    const invoiceErrs = (r.errors || []).filter((e) => !isGeneralErr(e));
+    const generalList = generalErrs.length ? h('div.notice.warn', { style: { marginTop: '10px' } }, icon('alert', 18), h('div',
+      h('div', h('b', 'Lưu ý khi đồng bộ:')),
+      h('ul', { style: { margin: '6px 0 0', paddingLeft: '18px', fontSize: '12.5px' } }, generalErrs.map((err) => h('li', err))))) : null;
+    const errList = invoiceErrs.length ? h('div.notice.warn', { style: { marginTop: '10px', alignItems: 'flex-start' } }, icon('alert', 18), h('div',
+      h('div', `${invoiceErrs.length} hóa đơn không tải được chi tiết (có thể mở từng hóa đơn để tải lại):`),
       h('ul', { style: { margin: '6px 0 0', paddingLeft: '18px', fontSize: '12.5px' } },
-        r.errors.slice(0, 10).map((err) => h('li', err)),
-        r.errors.length > 10 ? h('li.muted', `… và ${r.errors.length - 10} hóa đơn khác (xem chi tiết trong Nhật ký).`) : null))) : null;
-    clear(resultBox).append(...[h('div.result-grid', cell(r.fetched, 'Đã tải'), cell(r.added, 'Mới'), cell(r.updated, 'Cập nhật'), r.detailed ? cell(r.detailed, 'Có chi tiết') : null, h('div', h('b', `${(r.durationMs / 1000).toFixed(1)}s`), h('span', 'Thời gian'))), errList].filter(Boolean));
+        invoiceErrs.slice(0, 10).map((err) => h('li', err)),
+        invoiceErrs.length > 10 ? h('li.muted', `… và ${invoiceErrs.length - 10} hóa đơn khác (xem chi tiết trong Nhật ký).`) : null))) : null;
+    clear(resultBox).append(...[h('div.result-grid', cell(r.fetched, 'Đã tải'), cell(r.added, 'Mới'), cell(r.updated, 'Cập nhật'), r.detailed ? cell(r.detailed, 'Có chi tiết') : null, h('div', h('b', `${(r.durationMs / 1000).toFixed(1)}s`), h('span', 'Thời gian'))), generalList, errList].filter(Boolean));
   }
 
   /** Cảnh báo trước nếu MST đang đăng nhập trên trang Thuế khác doanh nghiệp đang chọn — trước khi bấm Bắt đầu. */

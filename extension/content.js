@@ -52,11 +52,11 @@
   const ym = (v) => { const d = dateParts(v); return d ? `${d.getFullYear()}-${pad(d.getMonth() + 1)}` : 'khong-ro-thang'; };
   const keyOf = (it) => `${it.nbmst}|${it.khhdon}|${it.shdon}|${it.khmshdon}`;
 
-  function chunks(from, to) {
+  function chunks(from, to, maxDays = MAX_DAYS) {
     const out = []; let cur = new Date(`${from}T00:00:00`); const end = new Date(`${to}T00:00:00`);
     while (cur <= end) {
       const monthEnd = new Date(cur.getFullYear(), cur.getMonth() + 1, 0);
-      const cap = new Date(cur.getTime() + (MAX_DAYS - 1) * 86400000);
+      const cap = new Date(cur.getTime() + (maxDays - 1) * 86400000);
       const stop = new Date(Math.min(end.getTime(), monthEnd.getTime(), cap.getTime()));
       out.push([isoLocal(cur), isoLocal(stop)]); cur = new Date(stop.getTime() + 86400000);
     }
@@ -138,13 +138,17 @@
       box.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.55);z-index:999999;display:flex;align-items:center;justify-content:center;font-family:sans-serif;';
       const panel = document.createElement('div');
       panel.style.cssText = 'background:#fff;border-radius:10px;padding:20px 24px;max-width:380px;width:90%;box-shadow:0 8px 30px rgba(0,0,0,0.3);text-align:center;';
+      const isSvg = /^\s*</.test(imgData);
+      const imgHtml = isSvg
+        ? `<div style="display:inline-flex;align-items:center;justify-content:center;height:44px;border:1px solid #cbd5e1;border-radius:6px;padding:2px 8px;background:#f8fafc;vertical-align:middle;overflow:hidden;">${imgData}</div>`
+        : `<img src="${imgData}" style="height:44px;border:1px solid #cbd5e1;border-radius:6px;vertical-align:middle;" />`;
       panel.innerHTML = `<h3 style="margin:0 0 10px;font-size:16px;color:#1e293b;">Mã xác thực Cổng Thuế</h3>
-        <p style="font-size:12.5px;color:#64748b;margin:0 0 12px;line-height:1.4;">Cổng Thuế yêu cầu mã xác thực để tải hóa đơn máy tính tiền. Vui lòng nhập mã trong ảnh:</p>
-        <div style="margin:10px 0;"><img src="${imgData}" style="height:44px;border:1px solid #cbd5e1;border-radius:6px;vertical-align:middle;" /></div>
-        <input type="text" id="__cval" placeholder="Nhập mã xác thực" style="width:100%;box-sizing:border-box;padding:8px 12px;font-size:15px;letter-spacing:1px;text-align:center;border:1.5px solid #2b3a8c;border-radius:6px;margin:8px 0 14px;" />
+        <p style="font-size:12.5px;color:#64748b;margin:0 0 12px;line-height:1.4;">Cổng Thuế yêu cầu mã xác thực để tra cứu hóa đơn máy tính tiền (POS). Vui lòng nhập mã trong ảnh:</p>
+        <div style="margin:10px 0;">${imgHtml}</div>
+        <input type="text" id="__cval" placeholder="Nhập mã xác thực" maxlength="8" style="width:100%;box-sizing:border-box;padding:8px 12px;font-size:16px;letter-spacing:2px;font-weight:600;text-transform:uppercase;text-align:center;border:1.5px solid #2b3a8c;border-radius:6px;margin:8px 0 14px;" />
         <div style="display:flex;gap:8px;justify-content:center;">
-          <button id="__cbtn" style="padding:8px 16px;background:#2b3a8c;color:#fff;border:none;border-radius:6px;font-weight:600;cursor:pointer;">Xác nhận</button>
-          <button id="__cskip" style="padding:8px 16px;background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;border-radius:6px;cursor:pointer;">Bỏ qua</button>
+          <button id="__cbtn" style="padding:8px 18px;background:#2b3a8c;color:#fff;border:none;border-radius:6px;font-weight:600;cursor:pointer;">Xác nhận</button>
+          <button id="__cskip" style="padding:8px 18px;background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;border-radius:6px;cursor:pointer;">Bỏ qua</button>
         </div>`;
       box.appendChild(panel);
       document.body.appendChild(box);
@@ -158,14 +162,19 @@
   }
 
   async function getFreshCaptcha() {
-    try {
-      const res = await fetch(`${location.origin}/captcha`, { headers: { Accept: 'application/json' }, credentials: 'same-origin' });
-      if (!res.ok) return null;
-      const j = await res.json();
-      if (!j.key) return null;
-      const code = await promptCaptcha(j.key, j.content || j.image || `data:image/png;base64,${j.content}`);
-      return code ? { key: j.key, code } : null;
-    } catch { return null; }
+    for (const p of ['/api/captcha', '/captcha']) {
+      try {
+        const res = await fetch(`${location.origin}${p}`, { headers: { Accept: 'application/json' }, credentials: 'same-origin' });
+        if (!res.ok) continue;
+        const j = await res.json();
+        if (!j || !j.key) continue;
+        const raw = j.content || j.image || '';
+        const imgData = /^\s*</.test(raw) ? raw : (raw.startsWith('data:') ? raw : `data:image/png;base64,${raw}`);
+        const code = await promptCaptcha(j.key, imgData);
+        return code ? { key: j.key, code } : null;
+      } catch { /* thử đường dẫn kế tiếp */ }
+    }
+    return null;
   }
 
   async function call(url, label, binary = false, viaEtax = false) {
@@ -174,7 +183,7 @@
       await gate();
       const token = findToken();
       if (!token) throw new Stop(viaEtax ? `Không thấy phiên đăng nhập (có thể đã hết hạn). Hãy đăng nhập lại trên trang Thuế — ${ETAX_RETRY}` : 'Không thấy phiên đăng nhập (có thể đã hết hạn). Hãy đăng nhập lại trên trang này rồi bấm "Tiếp tục".');
-      if (location.pathname !== ROUTE) throw new Stop(viaEtax ? `Bạn đã rời màn hình Tra cứu hóa đơn. Hãy quay lại màn hình đó — ${ETAX_RETRY}` : 'Bạn đã rời màn hình Tra cứu hóa đơn. Hãy quay lại màn hình đó rồi bấm "Tiếp tục".');
+      if (!location.pathname.startsWith(ROUTE)) throw new Stop(viaEtax ? `Bạn đã rời màn hình Tra cứu hóa đơn. Hãy quay lại màn hình đó — ${ETAX_RETRY}` : 'Bạn đã rời màn hình Tra cứu hóa đơn. Hãy quay lại màn hình đó rồi bấm "Tiếp tục".');
       const ctrl = new AbortController();
       const timer = setTimeout(() => ctrl.abort(), binary ? 90000 : 45000);
       let r, buf;
@@ -195,11 +204,17 @@
       const head = buf.byteLength < 8192 ? new TextDecoder().decode(buf) : '';
       if (isBlocked(head)) throw new Stop('Cổng Thuế đã chặn yêu cầu (chống truy cập tự động). Tiện ích DỪNG và giữ tiến độ, không thử cách khác. Hãy chờ một lúc, hoặc dùng nút xuất Excel/XML thủ công của trang Thuế.');
       if (r.status === 401 || r.status === 403) throw new Stop(viaEtax ? `Phiên đăng nhập hết hạn hoặc bị từ chối. Hãy đăng nhập lại trên trang Thuế — ${ETAX_RETRY}` : 'Phiên đăng nhập hết hạn hoặc bị từ chối. Hãy đăng nhập lại trên trang này rồi bấm "Tiếp tục".');
-      if (r.status === 400 && /captcha|mã xác thực|ckey|cvalue/i.test(head)) {
-        const c = await getFreshCaptcha();
-        if (c) {
-          activeUrl = url + `&ckey=${encodeURIComponent(c.key)}&cvalue=${encodeURIComponent(c.code)}`;
-          continue;
+      if (r.status === 400) {
+        const isRange = /khoảng ngày|ngày|giới hạn/i.test(head);
+        const isCaptcha = /captcha|xác thực|ckey|cvalue|bảo mật|mã/i.test(head) || activeUrl.includes('/sco-query/');
+        if (!isRange && isCaptcha) {
+          const c = await getFreshCaptcha();
+          if (c) {
+            const cleanUrl = url.replace(/[?&]ckey=[^&]*/g, '').replace(/[?&]cvalue=[^&]*/g, '');
+            const sep = cleanUrl.includes('?') ? '&' : '?';
+            activeUrl = `${cleanUrl}${sep}ckey=${encodeURIComponent(c.key)}&cvalue=${encodeURIComponent(c.code)}`;
+            continue;
+          }
         }
       }
       if (r.status === 429 || r.status >= 500) {

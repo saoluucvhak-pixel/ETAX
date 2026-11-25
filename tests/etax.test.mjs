@@ -264,3 +264,17 @@ test('export/invoiceHtml: renders official GDT form layout and escapes HTML', ()
   assert.ok(html.includes('Công ty &lt;ABC&gt;'));
   assert.ok(!html.includes('Công ty <ABC>'));
 });
+
+test('extension/content.js: chunks function accepts maxDays parameter and handles sco-query 10-day limit', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const content = await readFile(path.join(ROOT, 'extension', 'content.js'), 'utf8');
+  assert.match(content, /function chunks\(from,\s*to,\s*maxDays\s*=\s*MAX_DAYS\)/);
+  assert.match(content, /\/api\/captcha/);
+
+  const ranges10 = splitDateRange('2026-11-01', '2026-11-25', 10);
+  assert.equal(ranges10.length, 3);
+  assert.deepEqual(ranges10[0], ['2026-11-01', '2026-11-10']);
+  assert.deepEqual(ranges10[1], ['2026-11-11', '2026-11-20']);
+  assert.deepEqual(ranges10[2], ['2026-11-21', '2026-11-25']);
+});
+
