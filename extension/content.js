@@ -131,7 +131,45 @@
   // Lệnh từ eTax Manager (viaEtax=true) KHÔNG có nút "Tiếp tục" trong hộp tiện ích (nút đó chỉ hiện khi đang chạy,
   // biến mất ngay khi lỗi) — phải chỉ đúng chỗ làm tiếp thật: nút "Bắt đầu đồng bộ" trong eTax Manager.
   const ETAX_RETRY = 'tiến độ đã liệt kê được giữ lại, bấm "Bắt đầu đồng bộ" trong eTax Manager để làm tiếp.';
+  // Hỗ trợ nhập CAPTCHA khi Cổng Thuế yêu cầu mã xác thực cho hóa đơn máy tính tiền (sco-query)
+  function promptCaptcha(key, imgData) {
+    return new Promise((resolve) => {
+      const box = document.createElement('div');
+      box.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.55);z-index:999999;display:flex;align-items:center;justify-content:center;font-family:sans-serif;';
+      const panel = document.createElement('div');
+      panel.style.cssText = 'background:#fff;border-radius:10px;padding:20px 24px;max-width:380px;width:90%;box-shadow:0 8px 30px rgba(0,0,0,0.3);text-align:center;';
+      panel.innerHTML = `<h3 style="margin:0 0 10px;font-size:16px;color:#1e293b;">Mã xác thực Cổng Thuế</h3>
+        <p style="font-size:12.5px;color:#64748b;margin:0 0 12px;line-height:1.4;">Cổng Thuế yêu cầu mã xác thực để tải hóa đơn máy tính tiền. Vui lòng nhập mã trong ảnh:</p>
+        <div style="margin:10px 0;"><img src="${imgData}" style="height:44px;border:1px solid #cbd5e1;border-radius:6px;vertical-align:middle;" /></div>
+        <input type="text" id="__cval" placeholder="Nhập mã xác thực" style="width:100%;box-sizing:border-box;padding:8px 12px;font-size:15px;letter-spacing:1px;text-align:center;border:1.5px solid #2b3a8c;border-radius:6px;margin:8px 0 14px;" />
+        <div style="display:flex;gap:8px;justify-content:center;">
+          <button id="__cbtn" style="padding:8px 16px;background:#2b3a8c;color:#fff;border:none;border-radius:6px;font-weight:600;cursor:pointer;">Xác nhận</button>
+          <button id="__cskip" style="padding:8px 16px;background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;border-radius:6px;cursor:pointer;">Bỏ qua</button>
+        </div>`;
+      box.appendChild(panel);
+      document.body.appendChild(box);
+      const inp = panel.querySelector('#__cval');
+      inp.focus();
+      const done = (val) => { box.remove(); resolve(val); };
+      panel.querySelector('#__cbtn').addEventListener('click', () => done(inp.value.trim()));
+      panel.querySelector('#__cskip').addEventListener('click', () => done(null));
+      inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') done(inp.value.trim()); else if (e.key === 'Escape') done(null); });
+    });
+  }
+
+  async function getFreshCaptcha() {
+    try {
+      const res = await fetch(`${location.origin}/captcha`, { headers: { Accept: 'application/json' }, credentials: 'same-origin' });
+      if (!res.ok) return null;
+      const j = await res.json();
+      if (!j.key) return null;
+      const code = await promptCaptcha(j.key, j.content || j.image || `data:image/png;base64,${j.content}`);
+      return code ? { key: j.key, code } : null;
+    } catch { return null; }
+  }
+
   async function call(url, label, binary = false, viaEtax = false) {
+    let activeUrl = url;
     for (let attempt = 1; attempt <= BUSY_ATTEMPTS; attempt++) {
       await gate();
       const token = findToken();
@@ -141,7 +179,7 @@
       const timer = setTimeout(() => ctrl.abort(), binary ? 90000 : 45000);
       let r, buf;
       try {
-        r = await fetch(url, { headers: headers(label, token), credentials: 'same-origin', signal: ctrl.signal });
+        r = await fetch(activeUrl, { headers: headers(label, token), credentials: 'same-origin', signal: ctrl.signal });
         buf = await r.arrayBuffer();
       } catch (err) {
         if (err.name === 'AbortError') {
@@ -157,6 +195,13 @@
       const head = buf.byteLength < 8192 ? new TextDecoder().decode(buf) : '';
       if (isBlocked(head)) throw new Stop('Cổng Thuế đã chặn yêu cầu (chống truy cập tự động). Tiện ích DỪNG và giữ tiến độ, không thử cách khác. Hãy chờ một lúc, hoặc dùng nút xuất Excel/XML thủ công của trang Thuế.');
       if (r.status === 401 || r.status === 403) throw new Stop(viaEtax ? `Phiên đăng nhập hết hạn hoặc bị từ chối. Hãy đăng nhập lại trên trang Thuế — ${ETAX_RETRY}` : 'Phiên đăng nhập hết hạn hoặc bị từ chối. Hãy đăng nhập lại trên trang này rồi bấm "Tiếp tục".');
+      if (r.status === 400 && /captcha|mã xác thực|ckey|cvalue/i.test(head)) {
+        const c = await getFreshCaptcha();
+        if (c) {
+          activeUrl = url + `&ckey=${encodeURIComponent(c.key)}&cvalue=${encodeURIComponent(c.code)}`;
+          continue;
+        }
+      }
       if (r.status === 429 || r.status >= 500) {
         // Báo "còn sống" ngay cả khi đang thử lại — trước đây suốt lúc chạy qua eTax Manager KHÔNG có tín hiệu nào gửi về
         // cho tới khi một trang tải THÀNH CÔNG; nếu cổng Thuế bận nhiều lần liên tiếp, máy chủ cục bộ chờ quá 60 giây
@@ -291,23 +336,40 @@
    * rồi làm tiếp, thay vì để lỗi lan ra làm mất luôn kết quả của các mã đã chạy tốt. Không truyền callback này (chế độ thủ
    * công) thì hành vi giữ y hệt trước đây: lỗi bận vẫn dừng toàn bộ, không đổi. */
   async function listRange({ dirKey, from, to, codes, onPage, viaEtax = false, onCodeBusy }) {
-    const dir = DIRS[dirKey]; const parts = chunks(from, to); const queue = [...codes]; const total = parts.length * queue.length; let step = 0;
+    const dir = DIRS[dirKey]; const queue = [...codes]; let step = 0;
     for (let ci = 0; ci < queue.length; ci++) {
       const code = queue[ci];
-      const codeStartStep = step; // mốc step lúc bắt đầu mã này — dùng để nhảy đúng sang mã kế tiếp nếu mã này bị bỏ qua
+      let maxChunkDays = dir.pos ? 10 : MAX_DAYS;
+      let curPeriodList = chunks(from, to, maxChunkDays);
+      const codeStartStep = step;
       try {
-        for (const [f, t] of parts) {
+        let pi = 0;
+        while (pi < curPeriodList.length) {
+          const [f, t] = curPeriodList[pi];
           let cursor = null; let guard = 0;
           const search = `tdlap=ge=${portalDate(f)};tdlap=le=${portalDate(t, true)}${code ? `;ttxly==${code}` : ''}`;
-          do {
-            const url = `${location.origin}/api/${dir.api || 'query'}/invoices/${dir.path}?sort=tdlap:desc&size=${PAGE_SIZE}${cursor ? `&state=${cursor}` : ''}&search=${search}`;
-            const page = await call(url, `Tìm kiếm (${dir.label})`, false, viaEtax);
-            const items = page.datas || [];
-            await onPage(items, { f, t, step, total, code });
-            cursor = items.length < PAGE_SIZE ? null : (page.state || null);
-            await pace();
-          } while (cursor && ++guard < 5000);
-          step++;
+          try {
+            do {
+              const url = `${location.origin}/api/${dir.api || 'query'}/invoices/${dir.path}?sort=tdlap:desc&size=${PAGE_SIZE}${cursor ? `&state=${cursor}` : ''}&search=${search}`;
+              const page = await call(url, `Tìm kiếm (${dir.label})`, false, viaEtax);
+              const items = page.datas || [];
+              await onPage(items, { f, t, step, total: curPeriodList.length * queue.length, code });
+              cursor = items.length < PAGE_SIZE ? null : (page.state || null);
+              await pace();
+            } while (cursor && ++guard < 5000);
+            step++;
+            pi++;
+          } catch (err) {
+            const isRangeErr = /khoảng ngày|ngày|giới hạn|400/i.test(err?.message || '') && f !== t;
+            if (isRangeErr && maxChunkDays > 1) {
+              const half = Math.max(1, Math.floor(maxChunkDays / 2));
+              maxChunkDays = half;
+              const subChunks = chunks(f, t, half);
+              curPeriodList.splice(pi, 1, ...subChunks);
+              continue;
+            }
+            throw err;
+          }
         }
       } catch (e) {
         if (e instanceof Stop && !e.busy) throw e;
@@ -317,8 +379,8 @@
           continue;
         }
         // Máy tính tiền (/api/sco-query) chưa bật hoặc tạm lỗi ở chế độ bridge → bỏ qua phần POS để không mất phần chính
-        if (dir.pos && onCodeBusy) { step = codeStartStep + parts.length; await onCodeBusy('pos', e); continue; }
-        if (e instanceof Stop && e.busy && onCodeBusy) { step = codeStartStep + parts.length; await onCodeBusy(code, e); continue; }
+        if (dir.pos && onCodeBusy) { step = codeStartStep + curPeriodList.length; await onCodeBusy('pos', e); continue; }
+        if (e instanceof Stop && e.busy && onCodeBusy) { step = codeStartStep + curPeriodList.length; await onCodeBusy(code, e); continue; }
         throw e;
       }
     }

@@ -143,7 +143,35 @@ export async function mount(host) {
     await resetEverything();
   }
 
-  const install = h('button.btn.sm', { type: 'button', hidden: !canInstall(), onclick: async () => { if (await promptInstall()) toast('Đã cài đặt ứng dụng.', 'ok'); } }, icon('download', 15), h('span', 'Cài như ứng dụng'));
+  const updateBox = h('div');
+  const checkUpdateBtn = h('button.btn.sm', { type: 'button', onclick: async () => {
+    checkUpdateBtn.disabled = true;
+    clear(updateBox).append(h('span.muted', 'Đang kiểm tra bản cập nhật mới…'));
+    try {
+      const res = await fetch('https://api.github.com/repos/saoluucvhak-pixel/ETAX/releases/latest');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const rel = await res.json();
+      const latestTag = String(rel.tag_name || '').replace(/^v/, '');
+      const curVer = String(APP.version || '').replace(/^v/, '');
+      if (latestTag && latestTag !== curVer) {
+        const exeAsset = (rel.assets || []).find((a) => a.name?.endsWith('.exe'));
+        const extAsset = (rel.assets || []).find((a) => a.name?.endsWith('-extension.zip'));
+        clear(updateBox).append(h('div.notice.info', icon('download', 18),
+          h('div',
+            h('b', `Đã có phiên bản mới v${latestTag}! (Bạn đang dùng v${curVer})`),
+            h('div', { style: { marginTop: '6px', display: 'flex', gap: '8px', flexWrap: 'wrap' } },
+              exeAsset ? h('a.btn.sm.primary', { href: exeAsset.browser_download_url, target: '_blank', rel: 'noopener' }, 'Tải bộ cài (.exe)') : null,
+              extAsset ? h('a.btn.sm', { href: extAsset.browser_download_url, target: '_blank', rel: 'noopener' }, 'Tải Extension (.zip)') : null,
+              h('a.btn.sm.ghost', { href: rel.html_url, target: '_blank', rel: 'noopener' }, 'Xem chi tiết')))));
+      } else {
+        clear(updateBox).append(h('div.notice.ok', icon('check', 18), h('div', `Bạn đang sử dụng phiên bản mới nhất (v${curVer}).`)));
+      }
+    } catch (e) {
+      clear(updateBox).append(h('div.notice.warn', icon('alert', 18), h('div', `Không kiểm tra được: ${e.message}`)));
+    } finally {
+      checkUpdateBtn.disabled = false;
+    }
+  } }, icon('sync', 15), h('span', 'Kiểm tra cập nhật'));
 
   host.append(h('div.settings-grid',
     card('Giao diện', null, row('Chế độ màu', 'Sáng, tối hoặc theo hệ điều hành', theme), row('Ngôn ngữ', 'Menu và tiêu đề trang', lang), row('Số dòng mỗi trang (in)', 'Áp dụng cho bản in', pageSize),
@@ -162,7 +190,9 @@ export async function mount(host) {
       row('Sao lưu tự động hàng tháng', 'Cần trang đang mở và đã chọn thư mục lưu; không tự xóa bản cũ', autoBackupChk),
       row('Ngày chạy trong tháng', 'Nếu mở ứng dụng trễ hơn ngày này thì chạy bù ngay khi mở', backupDaySel),
       row('Trạng thái', null, lastBackupStatus))),
-    card('Ứng dụng', `${APP.name} ${APP.version}`, h('div', { style: { display: 'grid', gap: '12px' } }, h('div.row-gap', install),
+    card('Ứng dụng', `${APP.name} ${APP.version}`, h('div', { style: { display: 'grid', gap: '12px' } },
+      h('div.row-gap', { style: { flexWrap: 'wrap' } }, checkUpdateBtn, install),
+      updateBox,
       h('div.notice.warn', icon('alert', 18), h('div', 'Đặt lại sẽ xóa toàn bộ dữ liệu trên máy này.')),
       h('div', h('button.btn.danger', { type: 'button', onclick: reset }, icon('trash', 15), h('span', 'Đặt lại ứng dụng')))))));
   drawFolder();

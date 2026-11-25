@@ -188,6 +188,10 @@ export function invoiceHtml(inv) {
     ? `<div class="sig-valid"><b>Signature Valid</b><div>Ký bởi ${e(inv.sellerName || inv.sellerTax)}</div><div>Ký ngày: ${e(fmtDate(inv.date))} &#10004;</div></div>`
     : `<div style="height:48px"></div>`;
 
+  const totalDiscount = (inv.totalDiscount != null && Number(inv.totalDiscount) > 0)
+    ? Number(inv.totalDiscount)
+    : (inv.items || []).reduce((acc, it) => acc + (Number(it.kind) === 3 ? (Number(it.amount) || 0) : (Number(it.discount) || 0)), 0);
+
   return `<section class="page"><div class="gdt-sheet">
   <div class="gdt-head">
     <div style="display:flex;align-items:flex-start;gap:6px">${qrSvg(invoiceQrPayload(inv), 72)}${showStamp ? `<div class="stamp">${e(INVOICE_STATUS[inv.status]?.label || '')}</div>` : ''}</div>
@@ -255,7 +259,7 @@ export function invoiceHtml(inv) {
         <tr><td>Tổng tiền chưa thuế (Tổng cộng thành tiền chưa có thuế)</td><td class="r" style="width:120px">${fmtMoney(inv.net)}</td></tr>
         <tr><td>Tổng tiền thuế (Tổng cộng tiền thuế)</td><td class="r">${fmtMoney(inv.vat)}</td></tr>
         <tr><td>Tổng tiền phí</td><td class="r"></td></tr>
-        <tr><td>Tổng tiền chiết khấu thương mại</td><td class="r">0</td></tr>
+        <tr><td>Tổng tiền chiết khấu thương mại</td><td class="r">${totalDiscount ? fmtMoney(totalDiscount) : '0'}</td></tr>
         <tr><td>Tổng tiền thanh toán bằng số</td><td class="r"><b>${fmtMoney(inv.total)}</b></td></tr>
         <tr><td>Tổng tiền thanh toán bằng chữ</td><td class="c">${e(inv.totalInWords || '')}</td></tr>
       </tbody>
