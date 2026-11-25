@@ -116,14 +116,14 @@
           const err = new Error(`HTTP ${res.status}`);
           err.status = res.status;
           lastErr = err;
-          if (res.status === 401 || res.status === 403) throw err;
+          if (res.status === 401) throw err;
           continue;
         }
         cachedApiBase = base;
         return responseType === 'json' ? await res.json() : new Uint8Array(await res.arrayBuffer());
       } catch (e) {
         lastErr = e;
-        if (e.status === 401 || e.status === 403) throw e;
+        if (e.status === 401) throw e;
       } finally {
         clearTimeout(timer);
       }
@@ -156,9 +156,9 @@
         return { loggedIn: true, ...cachedProfile };
       }
     } catch (e) {
-      if (e.status === 401 || e.status === 403) {
+      if (e.status === 401) {
         cachedProfile = null;
-        return { loggedIn: false, mst: '', user: '', reason: `HTTP ${e.status}` };
+        return { loggedIn: false, mst: '', user: '', reason: 'HTTP 401' };
       }
       if (token) {
         const p = decodeJwtPayload(token);
@@ -168,9 +168,9 @@
           cachedProfile = { mst, user };
           return { loggedIn: true, ...cachedProfile };
         }
-        return { loggedIn: true, mst: cachedProfile?.mst || '', user: cachedProfile?.user || '' };
+        if (e.status !== 403) return { loggedIn: true, mst: cachedProfile?.mst || '', user: cachedProfile?.user || '' };
       }
-      return { loggedIn: false, mst: '', user: '', reason: e.message };
+      return { loggedIn: false, mst: '', user: '', reason: `${e.message} · ${token ? 'có token' : 'chưa có token'}` };
     }
     if (token) {
       const p = decodeJwtPayload(token);
