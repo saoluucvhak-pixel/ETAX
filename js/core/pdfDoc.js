@@ -17,6 +17,8 @@
  * sự bấm xuất PDF từng tệp.
  */
 
+import { qrMatrix, invoiceQrPayload } from './qr.js';
+
 const FONT = 'RobotoVN';
 
 /**
@@ -120,14 +122,25 @@ export function drawInvoicePdf(doc, inv, deps) {
   // Khung ngoài trang nhã
   doc.setDrawColor(...C.outer); doc.rect(M.l - 2, M.t - 2, CW + 4, PH - M.t - M.b + 4);
 
+  // Mã QR góc trên trái
+  const qMat = qrMatrix(invoiceQrPayload(inv));
+  const qSize = 17.5;
+  const qCell = qSize / qMat.length;
+  doc.setFillColor(...C.ink);
+  for (let r = 0; r < qMat.length; r++) {
+    for (let c = 0; c < qMat.length; c++) {
+      if (qMat[r][c]) doc.rect(M.l + c * qCell, y + r * qCell, qCell + 0.05, qCell + 0.05, 'F');
+    }
+  }
+
   // Đầu trang
   if (Number(inv.status) && Number(inv.status) !== 1) {
     const stLabel = INVOICE_STATUS[inv.status]?.label || '';
     if (stLabel) {
-      doc.setDrawColor(...C.red); doc.setTextColor(...C.red); doc.setFont(FONT, 'bold'); doc.setFontSize(8.5);
-      const wStamp = doc.getTextWidth(stLabel) + 5;
-      doc.rect(M.l, y, wStamp, 6);
-      doc.text(stLabel.toUpperCase(), M.l + wStamp / 2, y + 4.2, { align: 'center' });
+      doc.setDrawColor(...C.red); doc.setTextColor(...C.red); doc.setFont(FONT, 'bold'); doc.setFontSize(8);
+      const wStamp = doc.getTextWidth(stLabel) + 4;
+      doc.rect(M.l + 19, y, wStamp, 5.5);
+      doc.text(stLabel.toUpperCase(), M.l + 19 + wStamp / 2, y + 3.9, { align: 'center' });
     }
   }
   doc.setFont(FONT, 'bold'); doc.setFontSize(14.5); doc.setTextColor(...C.ink);
@@ -145,7 +158,7 @@ export function drawInvoicePdf(doc, inv, deps) {
   doc.text(`Ký hiệu: ${inv.series || ''}`, rx, y + 6.5);
   doc.text(`Số: ${inv.number || ''}`, rx, y + 11);
 
-  y += 17;
+  y += 19;
   doc.setDrawColor(...C.muted); doc.line(M.l, y, M.l + CW, y);
   y += 4.5;
 
