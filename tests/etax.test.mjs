@@ -211,3 +211,14 @@ test('electron/bridgeServer: allows app://etax and extension pairing, blocks unt
     await new Promise((r) => srv.close(r));
   }
 });
+
+test('extension/manifest.json: valid MV3 manifest targeting gdt portal and 127.0.0.1:8080 bridge', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const raw = await readFile(path.join(ROOT, 'extension', 'manifest.json'), 'utf8');
+  const mf = JSON.parse(raw);
+  assert.equal(mf.manifest_version, 3);
+  assert.equal(mf.background?.service_worker, 'background.js');
+  assert.ok(mf.host_permissions.includes('https://hoadondientu.gdt.gov.vn/*'));
+  assert.ok(mf.host_permissions.includes('http://127.0.0.1:8080/*'));
+  assert.deepEqual(mf.content_scripts?.[0]?.js, ['content.js']);
+});
