@@ -173,3 +173,41 @@ test('syncSession: preserves pct when onProgress receives pct: undefined', async
   resolveRun();
   await new Promise((r) => setTimeout(r, 20));
 });
+
+test('electron/bridgeServer: allows app://etax and extension pairing, blocks untrusted web origin', async () => {
+  const { createRequire } = await import('node:module');
+  const require = createRequire(import.meta.url);
+  const { createBridgeServer } = require('../electron/bridgeServer.cjs');
+
+  const srv = createBridgeServer({ port: 18925 });
+  await new Promise((r) => srv.listen(18925, '127.0.0.1', r));
+  try {
+    const rApp = await fetch('http://127.0.0.1:18925/__bridge/status', { headers: { Origin: 'app://etax' } });
+    assert.equal(rApp.status, 200);
+    assert.equal(rApp.headers.get('access-control-allow-origin'), 'app://etax');
+
+    const rEvil = await fetch('http://127.0.0.1:18925/__bridge/status', { headers: { Origin: 'https://evil.example' } });
+    assert.equal(rEvil.status, 403);
+
+    const rPair = await fetch('http://127.0.0.1:18925/__bridge/pair', { headers: { Origin: 'chrome-extension://abcdef' } });
+    assert.equal(rPair.status, 200);
+    const { pair } = await rPair.json();
+    assert.match(pair, /^[0-9a-f]{32}$/);
+
+    const rBadAuth = await fetch('http://127.0.0.1:18925/__bridge/hello', {
+      method: 'POST',
+      headers: { Origin: 'chrome-extension://abcdef', Authorization: 'Bearer wrong', 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    assert.equal(rBadAuth.status, 401);
+
+    const rOk = await fetch('http://127.0.0.1:18925/__bridge/hello', {
+      method: 'POST',
+      headers: { Origin: 'chrome-extension://abcdef', Authorization: `Bearer ${pair}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ loggedIn: true, mst: '0123456789' }),
+    });
+    assert.equal(rOk.status, 200);
+  } finally {
+    await new Promise((r) => srv.close(r));
+  }
+});

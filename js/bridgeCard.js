@@ -25,7 +25,7 @@ export function bridgeCard({ onUse }) {
     const extOk = server && st.extAgeMs != null && st.extAgeMs < 15000;
     const logged = extOk && st.ext?.loggedIn;
     clear(rows).append(
-      dot(server ? 'ok' : 'bad', server ? 'eTax Manager đang chạy bằng máy chủ cục bộ' : 'Chưa kết nối máy chủ cục bộ — hãy mở ứng dụng bằng Chay-eTax.bat (bản Electron chưa hỗ trợ cách này)'),
+      dot(server ? 'ok' : 'bad', server ? 'eTax Manager đang chạy máy chủ cầu nối cục bộ' : 'Chưa kết nối máy chủ cục bộ (127.0.0.1:8080) — hãy mở lại ứng dụng hoặc chạy Chay-eTax.bat'),
       dot(extOk ? 'ok' : 'bad', extOk ? 'Tiện ích trình duyệt đã kết nối' : 'Chưa thấy tiện ích — cài tiện ích (một lần) rồi mở trang Thuế'),
       dot(logged ? 'ok' : 'bad', logged ? `Trang Thuế đã đăng nhập${st.ext.mst ? ` (MST ${st.ext.mst})` : ''}` : 'Trang Thuế chưa đăng nhập — tự đăng nhập ở tab Thuế'));
     useBtn.disabled = !logged;
