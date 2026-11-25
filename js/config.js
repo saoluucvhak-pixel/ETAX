@@ -7,7 +7,7 @@
 
 export const APP = Object.freeze({
   name: 'eTax Manager HAK Group',
-  version: '1.3.18',
+  version: '1.3.19',
   dbName: 'etax-manager',
   dbVersion: 1,
 });

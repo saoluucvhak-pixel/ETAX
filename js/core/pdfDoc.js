@@ -66,165 +66,208 @@ export function newDoc({ jsPDF, regular, bold }) {
 // ---------------------------------------------------------------- Bố cục trang
 
 const C = {
-  ink: [22, 32, 46], navy: [43, 58, 140], muted: [91, 103, 120],
-  border: [201, 208, 220], headerBg: [234, 237, 245], red: [194, 55, 45], totalsBg: [243, 245, 250],
+  ink: [17, 17, 17], border: [34, 34, 34], muted: [85, 85, 85],
+  red: [185, 28, 28], green: [22, 163, 74], outer: [214, 200, 184],
 };
-const M = { l: 12, r: 12, t: 14, b: 14 };
+const M = { l: 12, r: 12, t: 12, b: 12 };
 const PW = 210, PH = 297, CW = PW - M.l - M.r;
 
+const KIND_LABEL = { 1: 'Hàng hóa, dịch vụ', 2: 'Khuyến mại', 3: 'Chiết khấu', 4: 'Ghi chú' };
 const ITEM_COLS = [
-  { key: 'stt', label: 'STT', w: 8, align: 'center' },
-  { key: 'name', label: 'Tên hàng hóa, dịch vụ', w: 66, align: 'left' },
-  { key: 'unit', label: 'ĐVT', w: 14, align: 'center' },
-  { key: 'qty', label: 'Số lượng', w: 18, align: 'right' },
-  { key: 'price', label: 'Đơn giá', w: 26, align: 'right' },
-  { key: 'amount', label: 'Thành tiền', w: 32, align: 'right' },
-  { key: 'rate', label: 'Thuế suất', w: 22, align: 'center' },
+  { key: 'stt', label: 'STT', w: 9, align: 'center' },
+  { key: 'kind', label: 'Tính chất', w: 21, align: 'left' },
+  { key: 'name', label: 'Tên hàng hóa, dịch vụ', w: 54, align: 'left' },
+  { key: 'unit', label: 'ĐVT', w: 12, align: 'center' },
+  { key: 'qty', label: 'SL', w: 13, align: 'right' },
+  { key: 'price', label: 'Đơn giá', w: 21, align: 'right' },
+  { key: 'disc', label: 'CK', w: 13, align: 'right' },
+  { key: 'rate', label: 'TS', w: 14, align: 'center' },
+  { key: 'amount', label: 'Thành tiền chưa thuế', w: 29, align: 'right' },
 ];
 const colX = (idx) => { let x = M.l; for (let i = 0; i < idx; i++) x += ITEM_COLS[i].w; return x; };
 
+function gdtDateWords(iso, fmtDate) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || '');
+  return m ? `Ngày ${m[3]} tháng ${m[2]} năm ${m[1]}` : `Ngày ${fmtDate(iso)}`;
+}
+
 function drawTableHeader(doc, y) {
-  const h = 7;
-  doc.setFillColor(...C.headerBg); doc.setDrawColor(...C.border);
-  doc.rect(M.l, y, CW, h, 'FD');
-  doc.setFont(FONT, 'bold'); doc.setFontSize(8.3); doc.setTextColor(...C.ink);
+  const h = 9;
+  doc.setDrawColor(...C.border);
+  doc.rect(M.l, y, CW, h);
+  doc.setFont(FONT, 'bold'); doc.setFontSize(7.6); doc.setTextColor(...C.ink);
   ITEM_COLS.forEach((c, i) => {
     const x = colX(i);
     if (i) doc.line(x, y, x, y + h);
-    const align = c.align === 'left' ? 'left' : c.align === 'right' ? 'right' : 'center';
-    const tx = c.align === 'left' ? x + 1.5 : c.align === 'right' ? x + c.w - 1.5 : x + c.w / 2;
-    doc.text(c.label, tx, y + h / 2 + 1.1, { align, maxWidth: c.w - 2 });
+    doc.text(c.label, x + c.w / 2, y + 4.2, { align: 'center', maxWidth: c.w - 1.5 });
   });
   return y + h;
 }
 
-/** Vẽ số trang "Trang X/Y" ở mọi trang đã dùng, canh lại sau khi biết tổng số trang. */
-function stampPageNumbers(doc, fmtMoneyFn, pageCount) {
+function stampPageNumbers(doc, pageCount) {
   for (let p = 1; p <= pageCount; p++) {
     doc.setPage(p);
     doc.setFont(FONT, 'normal'); doc.setFontSize(7.5); doc.setTextColor(...C.muted);
-    doc.text('Bản thể hiện tạo bởi eTax Manager từ dữ liệu đã đồng bộ — không thay thế hóa đơn điện tử gốc có chữ ký số.', M.l, PH - 8, { maxWidth: CW - 26 });
-    doc.text(`Trang ${p}/${pageCount}`, PW - M.r, PH - 8, { align: 'right' });
+    doc.text(`Trang ${p}/${pageCount}`, PW - M.r, PH - 6, { align: 'right' });
   }
 }
 
-/**
- * Vẽ một hóa đơn (bản thể hiện) vào `doc`, bắt đầu ở trang hiện tại (tự thêm trang mới nếu hàng hóa dài).
- * `deps` = { fmtMoney, fmtDate, TAX_RATE_LABEL, INVOICE_STATUS } — truyền vào để dùng đúng hàm định dạng/nhãn
- * của ứng dụng (không lặp logic đã có trong utils.js / config.js).
- */
 export function drawInvoicePdf(doc, inv, deps) {
   const { fmtMoney, fmtDate, TAX_RATE_LABEL, INVOICE_STATUS } = deps;
   let page = 1;
   let y = M.t;
 
-  // ---- Đầu trang: tem trạng thái, tiêu đề, mẫu số/ký hiệu/số
-  const stLabel = INVOICE_STATUS[inv.status]?.label || '';
-  if (stLabel) {
-    doc.setDrawColor(...C.red); doc.setTextColor(...C.red); doc.setFont(FONT, 'bold'); doc.setFontSize(10);
-    const wStamp = doc.getTextWidth(stLabel) + 6;
-    doc.roundedRect(M.l, y, wStamp, 7, 1, 1);
-    doc.text(stLabel, M.l + wStamp / 2, y + 4.8, { align: 'center' });
+  // Khung ngoài trang nhã
+  doc.setDrawColor(...C.outer); doc.rect(M.l - 2, M.t - 2, CW + 4, PH - M.t - M.b + 4);
+
+  // Đầu trang
+  if (Number(inv.status) && Number(inv.status) !== 1) {
+    const stLabel = INVOICE_STATUS[inv.status]?.label || '';
+    if (stLabel) {
+      doc.setDrawColor(...C.red); doc.setTextColor(...C.red); doc.setFont(FONT, 'bold'); doc.setFontSize(8.5);
+      const wStamp = doc.getTextWidth(stLabel) + 5;
+      doc.rect(M.l, y, wStamp, 6);
+      doc.text(stLabel.toUpperCase(), M.l + wStamp / 2, y + 4.2, { align: 'center' });
+    }
   }
-  doc.setFont(FONT, 'bold'); doc.setFontSize(16); doc.setTextColor(...C.navy);
-  doc.text(String(inv.invoiceName || 'Hóa đơn giá trị gia tăng').toUpperCase(), PW / 2, y + 5, { align: 'center' });
-  doc.setFont(FONT, 'normal'); doc.setFontSize(9.5); doc.setTextColor(...C.ink);
-  doc.text(`Ngày ${fmtDate(inv.date)}`, PW / 2, y + 11, { align: 'center' });
-
-  doc.setFontSize(9);
-  const rx = M.l + CW;
-  doc.text(`Mẫu số: ${inv.template || ''}`, rx, y + 2.5, { align: 'right' });
-  doc.text(`Ký hiệu: ${inv.series || ''}`, rx, y + 7, { align: 'right' });
-  doc.text(`Số: ${inv.number || ''}`, rx, y + 11.5, { align: 'right' });
-
-  y += 16;
-  doc.setDrawColor(...C.navy); doc.setLineWidth(0.6); doc.line(M.l, y, M.l + CW, y); doc.setLineWidth(0.2);
-  y += 5;
-
-  function kv(label, value, opts = {}) {
-    doc.setFont(FONT, 'normal'); doc.setFontSize(9.5); doc.setTextColor(...C.muted);
-    doc.text(label, M.l, y);
-    doc.setFont(FONT, opts.bold ? 'bold' : 'normal'); doc.setTextColor(...C.ink);
-    const lines = doc.splitTextToSize(String(value ?? ''), CW - 34);
-    doc.text(lines, M.l + 34, y);
-    y += 5 * lines.length;
+  doc.setFont(FONT, 'bold'); doc.setFontSize(14.5); doc.setTextColor(...C.ink);
+  doc.text(String(inv.invoiceName || 'HOÁ ĐƠN GIÁ TRỊ GIA TĂNG').toUpperCase(), PW / 2, y + 5, { align: 'center' });
+  doc.setFont(FONT, 'normal'); doc.setFontSize(9);
+  doc.text(gdtDateWords(inv.date, fmtDate), PW / 2, y + 10, { align: 'center' });
+  if (inv.invoiceCode) {
+    doc.setFontSize(8);
+    doc.text(`MCCQT: ${inv.invoiceCode}`, PW / 2, y + 14.5, { align: 'center' });
   }
-  kv('Người bán', inv.sellerName, { bold: true });
-  kv('Mã số thuế', inv.sellerTax);
-  kv('Địa chỉ', inv.sellerAddress);
-  y += 1.5;
-  doc.setDrawColor(...C.border); doc.setLineDashPattern([1, 1], 0); doc.line(M.l, y, M.l + CW, y); doc.setLineDashPattern([], 0);
-  y += 5;
-  kv('Người mua', inv.buyerName, { bold: true });
-  kv('Mã số thuế', inv.buyerTax);
-  kv('Địa chỉ', inv.buyerAddress);
-  if (inv.paymentMethod) kv('Hình thức TT', inv.paymentMethod);
 
-  y += 3;
-  doc.setFont(FONT, 'bold'); doc.setFontSize(10.5); doc.setTextColor(...C.ink);
-  doc.text('Hàng hóa, dịch vụ', M.l, y);
-  y += 3;
+  doc.setFontSize(8.5);
+  const rx = M.l + CW - 36;
+  doc.setFont(FONT, 'bold'); doc.text(`Mẫu số: ${inv.template || '1'}`, rx, y + 2);
+  doc.text(`Ký hiệu: ${inv.series || ''}`, rx, y + 6.5);
+  doc.text(`Số: ${inv.number || ''}`, rx, y + 11);
+
+  y += 17;
+  doc.setDrawColor(...C.muted); doc.line(M.l, y, M.l + CW, y);
+  y += 4.5;
+
+  const line = (label, val = '') => {
+    doc.setFont(FONT, 'normal'); doc.setFontSize(8.8); doc.setTextColor(...C.ink);
+    const txt = `${label}: ${val ?? ''}`;
+    const lines = doc.splitTextToSize(txt, CW);
+    doc.text(lines, M.l, y);
+    y += 4.2 * lines.length;
+  };
+  line('Tên người bán', inv.sellerName);
+  line('Mã số thuế', inv.sellerTax);
+  line('Địa chỉ', inv.sellerAddress);
+  line('Điện thoại', inv.sellerPhone || '');
+  line('Số tài khoản', inv.sellerBank || '');
+  y += 1;
+  doc.setDrawColor(...C.muted); doc.line(M.l, y, M.l + CW, y);
+  y += 4.5;
+  line('Tên người mua', inv.buyerName);
+  line('Họ tên người mua hàng', inv.buyerContact || '');
+  line('Mã số thuế', inv.buyerTax);
+  line('Địa chỉ', inv.buyerAddress);
+  line('Hình thức thanh toán', inv.paymentMethod || '');
+  line('Đơn vị tiền tệ', inv.currency || 'VND');
+
+  y += 2;
   y = drawTableHeader(doc, y);
 
   const items = inv.items?.length ? inv.items : [{ __empty: true }];
-  doc.setFont(FONT, 'normal'); doc.setFontSize(8.3); doc.setTextColor(...C.ink);
+  doc.setFont(FONT, 'normal'); doc.setFontSize(7.8); doc.setTextColor(...C.ink);
   items.forEach((it, i) => {
     const nameLines = it.__empty
       ? ['Chưa có chi tiết hàng hóa (mới đồng bộ phần tóm tắt).']
-      : doc.splitTextToSize(String(it.name || ''), ITEM_COLS[1].w - 3);
-    const rowH = Math.max(6, nameLines.length * 4 + 2);
-    if (y + rowH > PH - M.b - 55) { doc.addPage(); page++; y = M.t; y = drawTableHeader(doc, y); }
+      : doc.splitTextToSize(String(it.name || ''), ITEM_COLS[2].w - 2);
+    const rowH = Math.max(6, nameLines.length * 3.8 + 2);
+    if (y + rowH > PH - M.b - 68) { doc.addPage(); page++; y = M.t; y = drawTableHeader(doc, y); }
     doc.setDrawColor(...C.border);
     doc.rect(M.l, y, CW, rowH);
     ITEM_COLS.forEach((c, ci) => { if (ci) doc.line(colX(ci), y, colX(ci), y + rowH); });
-    const midY = y + rowH / 2 + 1.1;
+    const midY = y + rowH / 2 + 1;
     if (it.__empty) {
       doc.setTextColor(...C.muted);
-      doc.text(nameLines, colX(1) + 1.5, midY);
+      doc.text(nameLines, colX(2) + 1, midY);
       doc.setTextColor(...C.ink);
     } else {
       doc.text(String(it.stt ?? i + 1), colX(0) + ITEM_COLS[0].w / 2, midY, { align: 'center' });
-      doc.text(nameLines, colX(1) + 1.5, y + 4);
-      doc.text(String(it.unit || ''), colX(2) + ITEM_COLS[2].w / 2, midY, { align: 'center' });
-      doc.text(fmtMoney(it.qty), colX(3) + ITEM_COLS[3].w - 1.5, midY, { align: 'right' });
-      doc.text(fmtMoney(it.price), colX(4) + ITEM_COLS[4].w - 1.5, midY, { align: 'right' });
-      doc.text(fmtMoney(it.amount), colX(5) + ITEM_COLS[5].w - 1.5, midY, { align: 'right' });
-      doc.text(String(TAX_RATE_LABEL[it.rate] || it.rate || ''), colX(6) + ITEM_COLS[6].w / 2, midY, { align: 'center' });
+      doc.text(KIND_LABEL[it.kind] || 'Hàng hóa, dịch vụ', colX(1) + 1, midY, { maxWidth: ITEM_COLS[1].w - 2 });
+      doc.text(nameLines, colX(2) + 1, y + 3.8);
+      doc.text(String(it.unit || ''), colX(3) + ITEM_COLS[3].w / 2, midY, { align: 'center' });
+      doc.text(fmtMoney(it.qty), colX(4) + ITEM_COLS[4].w - 1, midY, { align: 'right' });
+      doc.text(fmtMoney(it.price), colX(5) + ITEM_COLS[5].w - 1, midY, { align: 'right' });
+      doc.text(fmtMoney(it.discount || 0), colX(6) + ITEM_COLS[6].w - 1, midY, { align: 'right' });
+      doc.text(String(TAX_RATE_LABEL[it.rate] || it.rate || ''), colX(7) + ITEM_COLS[7].w / 2, midY, { align: 'center' });
+      doc.text(fmtMoney(it.amount), colX(8) + ITEM_COLS[8].w - 1, midY, { align: 'right' });
     }
     y += rowH;
   });
 
-  // ---- Khối tổng cộng
-  const sumW = 90, sumX = M.l + CW - sumW;
-  const breakdown = inv.taxBreakdown || [];
-  const sumH = (2 + breakdown.length + 1) * 5.5 + 6;
-  if (y + sumH > PH - M.b - 12) { doc.addPage(); page++; y = M.t; }
+  // Hai bảng tổng hợp song song
+  const rates = inv.taxBreakdown?.length ? inv.taxBreakdown : [{ rate: '-', base: inv.net, tax: inv.vat }];
+  const blockH = Math.max(36, (rates.length + 1) * 5.5) + 46;
+  if (y + blockH > PH - M.b) { doc.addPage(); page++; y = M.t; }
   y += 4;
-  let sy = y;
-  doc.setFont(FONT, 'normal'); doc.setFontSize(9); doc.setTextColor(...C.ink);
-  breakdown.forEach((b) => {
-    doc.text(`Thuế suất ${TAX_RATE_LABEL[b.rate] || b.rate}`, sumX, sy);
-    doc.text(fmtMoney(b.tax), sumX + sumW, sy, { align: 'right' });
-    sy += 5.5;
+  const ly = y;
+  doc.setDrawColor(...C.border); doc.setFontSize(7.8);
+  // Bảng trái: Thuế suất
+  const lw = [22, 27, 25]; const lx = M.l;
+  doc.setFont(FONT, 'bold');
+  doc.rect(lx, ly, 74, 6); doc.line(lx + lw[0], ly, lx + lw[0], ly + 6); doc.line(lx + lw[0] + lw[1], ly, lx + lw[0] + lw[1], ly + 6);
+  doc.text('Thuế suất', lx + 11, ly + 4, { align: 'center' });
+  doc.text('Chưa thuế', lx + 35.5, ly + 4, { align: 'center' });
+  doc.text('Tiền thuế', lx + 61.5, ly + 4, { align: 'center' });
+  doc.setFont(FONT, 'normal');
+  rates.forEach((b, idx) => {
+    const ry = ly + 6 + idx * 5.5;
+    doc.rect(lx, ry, 74, 5.5); doc.line(lx + lw[0], ry, lx + lw[0], ry + 5.5); doc.line(lx + lw[0] + lw[1], ry, lx + lw[0] + lw[1], ry + 5.5);
+    doc.text(String(TAX_RATE_LABEL[b.rate] || b.rate), lx + 11, ry + 3.8, { align: 'center' });
+    doc.text(fmtMoney(b.base), lx + lw[0] + lw[1] - 1, ry + 3.8, { align: 'right' });
+    doc.text(fmtMoney(b.tax), lx + 73, ry + 3.8, { align: 'right' });
   });
-  doc.text('Cộng tiền hàng', sumX, sy); doc.text(fmtMoney(inv.net), sumX + sumW, sy, { align: 'right' }); sy += 5.5;
-  doc.text('Tiền thuế GTGT', sumX, sy); doc.text(fmtMoney(inv.vat), sumX + sumW, sy, { align: 'right' }); sy += 6.5;
-  doc.setFillColor(...C.totalsBg); doc.rect(sumX - 2, sy - 4.3, sumW + 2, 7, 'F');
-  doc.setFont(FONT, 'bold'); doc.setFontSize(10);
-  doc.text(`Tổng thanh toán (${inv.currency || 'VND'})`, sumX, sy);
-  doc.text(fmtMoney(inv.total), sumX + sumW, sy, { align: 'right' });
-  y = sy + 7;
 
-  if (inv.totalInWords) {
-    doc.setFont(FONT, 'normal'); doc.setFontSize(9.5); doc.setTextColor(...C.ink);
-    const lines = doc.splitTextToSize(`Số tiền viết bằng chữ: ${inv.totalInWords}`, CW);
-    doc.text(lines, M.l, y); y += lines.length * 5;
-  }
-  if (inv.invoiceCode) {
-    doc.setFontSize(9); doc.setTextColor(...C.muted);
-    doc.text(`Mã của cơ quan thuế: ${inv.invoiceCode}`, M.l, y);
-  }
+  // Bảng phải: Tổng tiền
+  const rxT = M.l + 78; const rw = CW - 78; const rLabelW = rw - 38;
+  const sumRows = [
+    ['Tổng tiền chưa thuế', fmtMoney(inv.net)],
+    ['Tổng tiền thuế', fmtMoney(inv.vat)],
+    ['Tổng tiền phí', ''],
+    ['Tổng tiền chiết khấu TM', '0'],
+    ['Tổng tiền thanh toán bằng số', fmtMoney(inv.total)],
+    ['Tổng tiền thanh toán bằng chữ', inv.totalInWords || ''],
+  ];
+  let sy = ly;
+  sumRows.forEach(([lbl, val], idx) => {
+    const lines = idx === 5 ? doc.splitTextToSize(String(val), 36) : [String(val)];
+    const h = Math.max(5.5, lines.length * 3.8 + 1.8);
+    doc.rect(rxT, sy, rw, h); doc.line(rxT + rLabelW, sy, rxT + rLabelW, sy + h);
+    doc.setFont(FONT, 'normal'); doc.text(lbl, rxT + 1.5, sy + 3.8);
+    doc.setFont(FONT, idx === 4 ? 'bold' : 'normal');
+    doc.text(lines, idx === 5 ? rxT + rLabelW + 19 : rxT + rw - 1.5, sy + 3.8, { align: idx === 5 ? 'center' : 'right' });
+    sy += h;
+  });
 
-  stampPageNumbers(doc, fmtMoney, page);
+  y = Math.max(ly + 6 + rates.length * 5.5, sy) + 7;
+  // Chữ ký số
+  doc.setFont(FONT, 'normal'); doc.setFontSize(8.5); doc.setTextColor(...C.ink);
+  doc.text('NGƯỜI MUA HÀNG', M.l + 40, y, { align: 'center' });
+  doc.text('NGƯỜI BÁN HÀNG', M.l + CW - 42, y, { align: 'center' });
+  doc.setFontSize(7.5);
+  doc.text('(Chữ ký số (nếu có))', M.l + 40, y + 4, { align: 'center' });
+  doc.text('(Chữ ký điện tử, chữ ký số)', M.l + CW - 42, y + 4, { align: 'center' });
+  if (inv.hasSignature || inv.invoiceCode) {
+    const bx = M.l + CW - 74, by = y + 7;
+    doc.setDrawColor(...C.green); doc.setTextColor(...C.green);
+    doc.rect(bx, by, 64, 16);
+    doc.setFont(FONT, 'bold'); doc.text('Signature Valid', bx + 2, by + 4.5);
+    doc.setFont(FONT, 'normal');
+    doc.text(`Ký bởi ${inv.sellerName || inv.sellerTax || ''}`, bx + 2, by + 9, { maxWidth: 60 });
+    doc.text(`Ký ngày: ${fmtDate(inv.date)}`, bx + 2, by + 13.5);
+  }
+  doc.setTextColor(...C.ink); doc.setFontSize(8);
+  doc.text('(Cần kiểm tra, đối chiếu khi lập, nhận hóa đơn)', PW / 2, y + 28, { align: 'center' });
+
+  stampPageNumbers(doc, page);
   return page;
 }
