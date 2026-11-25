@@ -123,7 +123,7 @@
         cachedApiBase = base;
         return responseType === 'json' ? await res.json() : new Uint8Array(await res.arrayBuffer());
       } catch (e) {
-        lastErr = e;
+        if (!lastErr || e.status) lastErr = e;
         if (e.status === 401) throw e;
       } finally {
         clearTimeout(timer);
@@ -232,35 +232,36 @@
     const baseEp = job.direction === 'out' ? '/query/invoices/sold' : '/query/invoices/purchase';
     const posEp = job.direction === 'out' ? '/sco-query/invoices/sold' : '/sco-query/invoices/purchase';
     const chunks = splitDateRange(job.from, job.to);
-    const ttxlyList = job.codeMode === 'coma'
-      ? [5]
+    const passes = job.codeMode === 'coma'
+      ? [{ ep: baseEp, ttxly: 5, label: 'có mã', canSkip: false }]
       : job.codeMode === 'khongma'
-        ? [6]
-        : job.pos ? [5, 6, 8] : [5, 6];
+        ? [{ ep: baseEp, ttxly: 6, label: 'không mã', canSkip: false }]
+        : [
+            { ep: baseEp, ttxly: null, label: 'hóa đơn', canSkip: false },
+            ...(job.pos ? [{ ep: posEp, ttxly: 8, label: 'máy tính tiền', canSkip: true }] : []),
+          ];
     const skipped = [];
 
     try {
-      const totalSteps = Math.max(1, chunks.length * ttxlyList.length);
+      const totalSteps = Math.max(1, chunks.length * passes.length);
       let step = 0;
 
       for (const [f, t] of chunks) {
-        for (const ttxly of ttxlyList) {
+        for (const pass of passes) {
           step++;
           let cursor = null;
           let guard = 0;
-          const endpoint = ttxly === 8 ? posEp : baseEp;
-          const canSkip = ttxly === 8 || (ttxly === 6 && job.codeMode === 'all');
-          const search = `tdlap=ge=${gdtStamp(f)};tdlap=le=${gdtStamp(t, true)};ttxly==${ttxly}`;
+          const search = `tdlap=ge=${gdtStamp(f)};tdlap=le=${gdtStamp(t, true)}${pass.ttxly != null ? `;ttxly==${pass.ttxly}` : ''}`;
           do {
             await sleep(GAP_MS);
             const q = new URLSearchParams({ sort: 'tdlap:desc,khmshdon:asc,shdon:desc', size: '50', search });
             if (cursor) q.set('state', cursor);
             const res = await withPortalRetry(
-              () => portalFetch(`${endpoint}?${q.toString()}`),
+              () => portalFetch(`${pass.ep}?${q.toString()}`),
               {
-                onSkip: canSkip
+                onSkip: pass.canSkip
                   ? (err) => {
-                      skipped.push(`ttxly=${ttxly} (${f}→${t}: ${err.status})`);
+                      skipped.push(`${pass.label} (${f}→${t}: ${err.status})`);
                       return { datas: [], state: null };
                     }
                   : undefined,
@@ -275,7 +276,7 @@
               jobId: job.id,
               state: 'running',
               pct: Math.min(0.95, step / totalSteps),
-              message: `${f} → ${t} (loại ${ttxly})`,
+              message: `${f} → ${t} (${pass.label})`,
             });
           } while (cursor && ++guard < 2000);
         }
