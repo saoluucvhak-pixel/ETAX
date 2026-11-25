@@ -131,26 +131,56 @@
     throw lastErr || new Error('Không kết nối được API cổng Thuế');
   }
 
+  function decodeJwtPayload(token) {
+    try {
+      const parts = String(token || '').split('.');
+      if (parts.length !== 3) return null;
+      const b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+      const json = decodeURIComponent(atob(b64).split('').map((c) => `%${c.charCodeAt(0).toString(16).padStart(2, '0')}`).join(''));
+      return JSON.parse(json);
+    } catch {
+      return null;
+    }
+  }
+
   async function fetchProfile() {
-    if (cachedProfile?.mst && getPortalToken()) return { loggedIn: true, ...cachedProfile };
+    const token = getPortalToken();
+    if (cachedProfile?.mst && token) return { loggedIn: true, ...cachedProfile };
     try {
       const j = await portalFetch('/security-taxpayer/profile', { timeoutMs: 12000 });
       const d = j?.data || j || {};
-      const mst = String(d.mst || d.tin || d.taxCode || d.username || '');
-      const user = String(d.hoTen || d.fullName || d.ten || d.username || '');
-      if (!mst && !user) {
-        cachedProfile = null;
-        return { loggedIn: false, mst: '', user: '' };
+      const mst = String(d.mst || d.tin || d.taxCode || d.maSoThue || d.username || d.id || '');
+      const user = String(d.hoTen || d.fullName || d.ten || d.name || d.tenNnt || d.companyName || d.username || '');
+      if (mst || user) {
+        cachedProfile = { mst, user };
+        return { loggedIn: true, ...cachedProfile };
       }
-      cachedProfile = { mst, user };
-      return { loggedIn: true, ...cachedProfile };
     } catch (e) {
-      if (e.status === 401 || e.status === 403 || !getPortalToken()) {
+      if (e.status === 401 || e.status === 403) {
         cachedProfile = null;
-        return { loggedIn: false, mst: '', user: '' };
+        return { loggedIn: false, mst: '', user: '', reason: `HTTP ${e.status}` };
       }
-      return { loggedIn: true, mst: cachedProfile?.mst || '', user: cachedProfile?.user || '' };
+      if (token) {
+        const p = decodeJwtPayload(token);
+        if (p && (!p.exp || p.exp * 1000 > Date.now())) {
+          const mst = String(p.mst || p.tin || p.taxCode || p.sub || p.username || '');
+          const user = String(p.name || p.hoTen || p.username || '');
+          cachedProfile = { mst, user };
+          return { loggedIn: true, ...cachedProfile };
+        }
+        return { loggedIn: true, mst: cachedProfile?.mst || '', user: cachedProfile?.user || '' };
+      }
+      return { loggedIn: false, mst: '', user: '', reason: e.message };
     }
+    if (token) {
+      const p = decodeJwtPayload(token);
+      if (p && (!p.exp || p.exp * 1000 > Date.now())) {
+        const mst = String(p.mst || p.tin || p.taxCode || p.sub || p.username || '');
+        return { loggedIn: true, mst, user: String(p.name || p.username || '') };
+      }
+    }
+    cachedProfile = null;
+    return { loggedIn: false, mst: '', user: '', reason: token ? 'profile trống' : 'chưa thấy token' };
   }
 
   function splitDateRange(from, to) {
@@ -300,7 +330,7 @@
       });
       setUiStatus(prof.loggedIn
         ? `Đã kết nối eTax${prof.mst ? ` · MST ${prof.mst}` : ''}`
-        : 'Đã kết nối eTax · Chưa đăng nhập trang Thuế');
+        : `Đã kết nối eTax · Chưa đăng nhập (${prof.reason || 'không có phiên'})`);
 
       if (!prof.loggedIn || (!autoRun && !manual)) return;
       const { job } = await bridge('job', 'GET');
