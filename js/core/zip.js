@@ -129,7 +129,7 @@ export async function unzip(input) {
   const out = new Map();
 
   for (let n = 0; n < count; n++) {
-    if (dv.getUint32(p, true) !== 0x02014b50) throw new Error('ZIP bị hỏng (central directory)');
+    if (p + 46 > u8.length || dv.getUint32(p, true) !== 0x02014b50) throw new Error('ZIP bị hỏng (central directory)');
     const flags = dv.getUint16(p + 8, true);
     const method = dv.getUint16(p + 10, true);
     const csize = dv.getUint32(p + 20, true);
@@ -137,12 +137,14 @@ export async function unzip(input) {
     const extraLen = dv.getUint16(p + 30, true);
     const commentLen = dv.getUint16(p + 32, true);
     const lho = dv.getUint32(p + 42, true);
+    if (p + 46 + nameLen > u8.length) throw new Error('ZIP bị hỏng (tên tệp)');
     const name = (flags & 0x0800 ? dec : new TextDecoder('latin1')).decode(u8.subarray(p + 46, p + 46 + nameLen));
     p += 46 + nameLen + extraLen + commentLen;
 
     if (name.endsWith('/')) continue;
-    if (dv.getUint32(lho, true) !== 0x04034b50) throw new Error('ZIP bị hỏng (local header)');
+    if (lho + 30 > u8.length || dv.getUint32(lho, true) !== 0x04034b50) throw new Error('ZIP bị hỏng (local header)');
     const start = lho + 30 + dv.getUint16(lho + 26, true) + dv.getUint16(lho + 28, true);
+    if (start + csize > u8.length) throw new Error('ZIP bị hỏng (dữ liệu nén)');
     const slice = u8.subarray(start, start + csize);
     if (method === 0) out.set(name, slice.slice());
     else if (method === 8) out.set(name, await inflateRaw(slice));

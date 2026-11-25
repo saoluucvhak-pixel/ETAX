@@ -12,12 +12,15 @@ import {
   escapeHtml,
   speedEtaText,
   pool,
+  toCsv,
 } from '../js/utils.js';
 import { DEFAULT_SETTINGS } from '../js/config.js';
 import { state } from '../js/core/state.js';
 import { GdtClient } from '../js/api.js';
 import * as syncEngine from '../js/core/syncEngine.js';
 import * as backup from '../js/core/backup.js';
+import { zip, unzip } from '../js/core/zip.js';
+import * as syncSession from '../js/core/syncSession.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -128,4 +131,45 @@ test('backup: computeBackupSha256 & validateBackupPayload enforce fail-closed in
   await assert.doesNotReject(() => backup.validateBackupPayload({ app: 'etax-manager', schemaVersion: 1, stores, sha256 }));
   await assert.rejects(() => backup.validateBackupPayload({ app: 'etax-manager', schemaVersion: 1, stores: { invoices: 'bad' }, sha256 }), /không hợp lệ/i);
   await assert.rejects(() => backup.validateBackupPayload({ app: 'etax-manager', schemaVersion: 1, stores, sha256: '0'.repeat(64) }), /toàn vẹn|SHA-256/i);
+});
+
+test('toCsv: neutralizes CSV formula injection while preserving negative numbers', () => {
+  const csv = toCsv(
+    [{ header: 'Name', key: 'name' }, { header: 'Amount', key: 'amount' }],
+    [
+      { name: '=CMD()', amount: -500 },
+      { name: '+1+1', amount: '-123.45' },
+      { name: '@SUM(A1)', amount: 100 },
+    ],
+  );
+  assert.ok(csv.includes("'=CMD()"));
+  assert.ok(csv.includes("'+1+1"));
+  assert.ok(csv.includes("'@SUM(A1)"));
+  assert.ok(csv.includes(',-500\r\n'));
+  assert.ok(csv.includes(',-123.45\r\n'));
+});
+
+test('zip/unzip: roundtrip and fail-closed on truncated central directory', async () => {
+  const archive = await zip([{ name: 'a.txt', data: 'hello' }], { compress: false });
+  const files = await unzip(archive);
+  assert.equal(new TextDecoder().decode(files.get('a.txt')), 'hello');
+
+  const truncated = archive.slice(0, archive.length - 10);
+  await assert.rejects(() => unzip(truncated), /ZIP/i);
+});
+
+test('syncSession: preserves pct when onProgress receives pct: undefined', async () => {
+  let resolveRun;
+  syncSession.start(async ({ onProgress }) => {
+    onProgress({ pct: 0.65, message: 'Đang tải', count: 10 });
+    onProgress({ pct: undefined, message: 'Thử lại lần 1…' });
+    await new Promise((r) => { resolveRun = r; });
+    return { fetched: 10, added: 10, updated: 0 };
+  });
+  await new Promise((r) => setTimeout(r, 20));
+  const snap = syncSession.getSnapshot();
+  assert.equal(snap.pct, 0.65);
+  assert.equal(snap.message, 'Thử lại lần 1…');
+  resolveRun();
+  await new Promise((r) => setTimeout(r, 20));
 });
