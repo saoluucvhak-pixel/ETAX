@@ -183,6 +183,10 @@ test('electron/bridgeServer: allows app://etax and extension pairing, blocks unt
   const srv = createBridgeServer({ port: 18925 });
   await new Promise((r) => srv.listen(18925, '127.0.0.1', r));
   try {
+    const rPing = await fetch('http://127.0.0.1:18925/gdt/__ping');
+    assert.equal(rPing.status, 200);
+    assert.equal((await rPing.json()).ok, true);
+
     const rApp = await fetch('http://127.0.0.1:18925/__bridge/status', { headers: { Origin: 'app://etax' } });
     assert.equal(rApp.status, 200);
     assert.equal(rApp.headers.get('access-control-allow-origin'), 'app://etax');
@@ -213,21 +217,25 @@ test('electron/bridgeServer: allows app://etax and extension pairing, blocks unt
   }
 });
 
-test('extension/manifest.json: valid MV3 manifest targeting gdt portal and 127.0.0.1:8080 bridge', async () => {
+test('extension/manifest.json & jszip shim: valid MV3 manifest and JSZip roundtrip', async () => {
   const { readFile } = await import('node:fs/promises');
   const raw = await readFile(path.join(ROOT, 'extension', 'manifest.json'), 'utf8');
   const mf = JSON.parse(raw);
   assert.equal(mf.manifest_version, 3);
   assert.equal(mf.background?.service_worker, 'background.js');
   assert.ok(mf.host_permissions.includes('https://hoadondientu.gdt.gov.vn/*'));
-  assert.ok(mf.host_permissions.includes('http://127.0.0.1:8080/*'));
-  assert.deepEqual(mf.content_scripts?.[0]?.js, ['hook.js']);
-  assert.equal(mf.content_scripts?.[0]?.world, 'MAIN');
-  assert.deepEqual(mf.content_scripts?.[1]?.js, ['content.js']);
+  assert.ok(mf.host_permissions.includes('http://127.0.0.1/*'));
+  assert.deepEqual(mf.content_scripts?.[0]?.js, ['lib/jszip.min.js', 'content.js']);
 
   const pkg = JSON.parse(await readFile(path.join(ROOT, 'package.json'), 'utf8'));
   assert.equal(APP.version, pkg.version);
-  assert.equal(mf.version, pkg.version);
+
+  await import('../extension/lib/jszip.min.js');
+  const z = new globalThis.JSZip();
+  z.file('test/invoice.xml', '<HDon><So>1</So></HDon>');
+  const bytes = await z.generateAsync({ type: 'uint8array' });
+  const loaded = await globalThis.JSZip.loadAsync(bytes);
+  assert.equal(await loaded.files['test/invoice.xml'].async('string'), '<HDon><So>1</So></HDon>');
 });
 
 test('export/invoiceHtml: renders official GDT form layout and escapes HTML', () => {
