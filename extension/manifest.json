@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "eTax Manager - Cầu nối trang Thuế",
+  "version": "1.0.2",
+  "description": "Kết nối phiên đăng nhập trên hoadondientu.gdt.gov.vn với eTax Manager HAK Group (không gửi mật khẩu/token).",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://hoadondientu.gdt.gov.vn/*",
+    "http://127.0.0.1:8080/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://hoadondientu.gdt.gov.vn/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

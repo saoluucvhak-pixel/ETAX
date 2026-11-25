@@ -1,13 +1,13 @@
 {
   "name": "etax-manager",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Quản lý hóa đơn điện tử và làm việc với cổng Thuế điện tử (Web / PWA / Electron)",
   "main": "electron/main.cjs",
   "type": "module",
   "private": true,
   "scripts": {
     "start": "node server/server.mjs",
-    "check": "node -e \"const fs=require('fs'),path=require('path'),{execFileSync}=require('child_process');function walk(d){for(const e of fs.readdirSync(d,{withFileTypes:true})){const p=path.join(d,e.name);if(e.isDirectory()&&!p.includes('js'+path.sep+'lib'))walk(p);else if(/\\.(js|mjs|cjs)$/.test(e.name))execFileSync(process.execPath,['--check',p],{stdio:'inherit'});}}['js','server','electron','tests'].forEach(walk);\"",
+    "check": "node -e \"const fs=require('fs'),path=require('path'),{execFileSync}=require('child_process');function walk(d){for(const e of fs.readdirSync(d,{withFileTypes:true})){const p=path.join(d,e.name);if(e.isDirectory()&&!p.includes('js'+path.sep+'lib'))walk(p);else if(/\\.(js|mjs|cjs)$/.test(e.name))execFileSync(process.execPath,['--check',p],{stdio:'inherit'});}}['js','server','electron','extension','tests'].forEach(walk);\"",
     "test": "node --test tests/*.test.mjs",
     "desktop": "electron .",
     "dist": "electron-builder"
@@ -20,6 +20,7 @@
     "appId": "vn.etax.manager",
     "productName": "eTax Manager HAK Group",
     "files": ["index.html", "manifest.json", "sw.js", "css/**", "js/**", "assets/**", "electron/**", "package.json"],
+    "extraResources": ["extension"],
     "publish": null,
     "win": { "target": "nsis", "icon": "assets/icon.ico" },
     "nsis": { "oneClick": true, "perMachine": false, "createDesktopShortcut": true, "createStartMenuShortcut": true, "shortcutName": "eTax Manager HAK Group" },
