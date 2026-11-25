@@ -10,10 +10,16 @@ let base = null; // http://127.0.0.1:8080
 let pair = null;
 let lastFail = 0;
 
+const fetchWithTimeout = (url, opts = {}, ms = 8000) => {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), ms);
+  return fetch(url, { ...opts, signal: ctrl.signal }).finally(() => clearTimeout(timer));
+};
+
 async function findBase() {
   for (const p of base ? [Number(new URL(base).port), ...PORTS] : PORTS) {
     try {
-      const r = await fetch(`http://127.0.0.1:${p}/gdt/__ping`, { cache: 'no-store' });
+      const r = await fetchWithTimeout(`http://127.0.0.1:${p}/gdt/__ping`, { cache: 'no-store' }, 2500);
       if (r.ok && (await r.json()).ok) return `http://127.0.0.1:${p}`;
     } catch { /* thử cổng khác */ }
   }
@@ -26,7 +32,7 @@ async function ensurePair() {
   base = await findBase();
   if (!base) { lastFail = Date.now(); return false; }
   try {
-    const r = await fetch(`${base}/__bridge/pair`, { cache: 'no-store' });
+    const r = await fetchWithTimeout(`${base}/__bridge/pair`, { cache: 'no-store' }, 4000);
     if (!r.ok) { lastFail = Date.now(); base = null; return false; }
     pair = (await r.json()).pair;
     return true;
@@ -35,7 +41,7 @@ async function ensurePair() {
 
 async function call(method, path, body) {
   if (!(await ensurePair())) return { ok: false, error: 'Không thấy eTax Manager đang chạy trên máy này. Hãy bấm Chay-eTax.bat trước.' };
-  const send = () => fetch(`${base}/__bridge/${path}`, { method, headers: { Authorization: `Bearer ${pair}`, 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+  const send = () => fetchWithTimeout(`${base}/__bridge/${path}`, { method, headers: { Authorization: `Bearer ${pair}`, 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined }, 10000);
   let r;
   try { r = await send(); } catch { base = pair = null; lastFail = Date.now(); return { ok: false, error: 'Mất kết nối với eTax Manager.' }; }
   if (r.status === 401) { // eTax khởi động lại -> mã ghép cặp mới

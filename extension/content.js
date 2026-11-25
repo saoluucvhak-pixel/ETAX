@@ -137,8 +137,23 @@
       const token = findToken();
       if (!token) throw new Stop(viaEtax ? `Không thấy phiên đăng nhập (có thể đã hết hạn). Hãy đăng nhập lại trên trang Thuế — ${ETAX_RETRY}` : 'Không thấy phiên đăng nhập (có thể đã hết hạn). Hãy đăng nhập lại trên trang này rồi bấm "Tiếp tục".');
       if (location.pathname !== ROUTE) throw new Stop(viaEtax ? `Bạn đã rời màn hình Tra cứu hóa đơn. Hãy quay lại màn hình đó — ${ETAX_RETRY}` : 'Bạn đã rời màn hình Tra cứu hóa đơn. Hãy quay lại màn hình đó rồi bấm "Tiếp tục".');
-      const r = await fetch(url, { headers: headers(label, token), credentials: 'same-origin' });
-      const buf = await r.arrayBuffer();
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), binary ? 90000 : 45000);
+      let r, buf;
+      try {
+        r = await fetch(url, { headers: headers(label, token), credentials: 'same-origin', signal: ctrl.signal });
+        buf = await r.arrayBuffer();
+      } catch (err) {
+        if (err.name === 'AbortError') {
+          const text = `Hết thời gian chờ cổng Thuế, thử lại lần ${attempt}/${BUSY_ATTEMPTS}…`;
+          setMsg(text, '', 'ok'); beat?.(viaEtax ? text : undefined);
+          if (attempt >= BUSY_ATTEMPTS) break;
+          await sleep(Math.min(2500 * attempt, 20000)); continue;
+        }
+        throw err;
+      } finally {
+        clearTimeout(timer);
+      }
       const head = buf.byteLength < 8192 ? new TextDecoder().decode(buf) : '';
       if (isBlocked(head)) throw new Stop('Cổng Thuế đã chặn yêu cầu (chống truy cập tự động). Tiện ích DỪNG và giữ tiến độ, không thử cách khác. Hãy chờ một lúc, hoặc dùng nút xuất Excel/XML thủ công của trang Thuế.');
       if (r.status === 401 || r.status === 403) throw new Stop(viaEtax ? `Phiên đăng nhập hết hạn hoặc bị từ chối. Hãy đăng nhập lại trên trang Thuế — ${ETAX_RETRY}` : 'Phiên đăng nhập hết hạn hoặc bị từ chối. Hãy đăng nhập lại trên trang này rồi bấm "Tiếp tục".');
@@ -162,7 +177,11 @@
   }
 
   // ------------------------------------------------------------------ Excel tối giản (xlsx tạo bằng JSZip)
-  const esc = (s) => String(s).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+  const esc = (s) => {
+    let t = String(s).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '');
+    if (/^[=+\-@\t\r]/.test(t) && !/^-\d+(\.\d+)?$/.test(t)) t = `'${t}`;
+    return t.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+  };
   const colName = (i) => { let s = ''; let n = i + 1; while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); } return s; };
   async function makeXlsx(head, rows, widths, sumCols) {
     const cell = (v, ri, ci) => {
