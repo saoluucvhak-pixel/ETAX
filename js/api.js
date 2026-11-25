@@ -309,10 +309,13 @@ export class GdtClient {
     const passes = [{ path: direction === DIRECTION.OUT ? GDT.paths.sold : GDT.paths.purchase, mode: codeMode, isPos: false }];
     if (pos) passes.push({ path: direction === DIRECTION.OUT ? GDT.paths.scoSold : GDT.paths.scoPurchase, mode: 'all', isPos: true });
     for (const pass of passes) {
-      const chunks = splitDateRange(from, to, pass.isPos ? 10 : GDT.maxRangeDays);
-      for (let ci = 0; ci < chunks.length; ci++) {
+      let maxChunkDays = pass.isPos ? 10 : GDT.maxRangeDays;
+      const chunks = splitDateRange(from, to, maxChunkDays);
+      let ci = 0;
+      while (ci < chunks.length) {
         const [f, t] = chunks[ci];
         const modes = pass.mode === 'all' ? ['all'] : [pass.mode];
+        let retryWithSplit = false;
         for (let mi = 0; mi < modes.length; mi++) {
           const search = buildSearch({ from: f, to: t, direction, codeMode: modes[mi], number, series, partnerTax, partnerName });
           let cursor = null;
@@ -335,6 +338,15 @@ export class GdtClient {
               if (items.length < GDT.pageSize) cursor = null;
             } while (cursor && ++guard < 2000);
           } catch (e) {
+            const isRangeErr = /khoảng ngày|ngày|giới hạn|400/i.test(e?.message || '') && f !== t;
+            if (isRangeErr && maxChunkDays > 1) {
+              const half = Math.max(1, Math.floor(maxChunkDays / 2));
+              maxChunkDays = half;
+              const subChunks = splitDateRange(f, t, half);
+              chunks.splice(ci, 1, ...subChunks);
+              retryWithSplit = true;
+              break;
+            }
             // Nếu cổng yêu cầu lọc ttxly riêng (khi mode='all' bị 400/500 ở lượt thường), tự tách sang coma + khongma
             if (!pass.isPos && modes.length === 1 && modes[0] === 'all' && !(e instanceof AuthError) && e.name !== 'AbortError') {
               modes.push('coma', 'khongma');
@@ -345,6 +357,7 @@ export class GdtClient {
             throw e;
           }
         }
+        if (!retryWithSplit) ci++;
       }
     }
   }

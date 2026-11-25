@@ -240,13 +240,17 @@ export function drawInvoicePdf(doc, inv, deps) {
     doc.text(fmtMoney(b.tax), lx + 73, ry + 3.8, { align: 'right' });
   });
 
+  const totalDiscount = (inv.totalDiscount != null && Number(inv.totalDiscount) > 0)
+    ? Number(inv.totalDiscount)
+    : (inv.items || []).reduce((acc, it) => acc + (Number(it.kind) === 3 ? (Number(it.amount) || 0) : (Number(it.discount) || 0)), 0);
+
   // Bảng phải: Tổng tiền
   const rxT = M.l + 78; const rw = CW - 78; const rLabelW = rw - 38;
   const sumRows = [
     ['Tổng tiền chưa thuế', fmtMoney(inv.net)],
     ['Tổng tiền thuế', fmtMoney(inv.vat)],
     ['Tổng tiền phí', ''],
-    ['Tổng tiền chiết khấu TM', '0'],
+    ['Tổng tiền chiết khấu TM', totalDiscount ? fmtMoney(totalDiscount) : '0'],
     ['Tổng tiền thanh toán bằng số', fmtMoney(inv.total)],
     ['Tổng tiền thanh toán bằng chữ', inv.totalInWords || ''],
   ];
