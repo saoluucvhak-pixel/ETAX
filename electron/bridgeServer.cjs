@@ -58,6 +58,7 @@ function createBridgeServer({ port = 8080 } = {}) {
     };
 
     if (req.method === 'OPTIONS') return send(204, {});
+    if (req.url === '/gdt/__ping') return send(200, { ok: true, target: 'https://hoadondientu.gdt.gov.vn:30000' });
     if (!req.url || !req.url.startsWith('/__bridge/')) return send(404, { error: 'not found' });
 
     let route;

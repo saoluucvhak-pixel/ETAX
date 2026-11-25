@@ -1,0 +1,46 @@
+eTAX - TẢI HÓA ĐƠN HÀNG LOẠT (extension Chrome/Edge, bản 1.2.0)
+
+TÍNH NĂNG
+  - Tải XML gốc của từng hóa đơn mua vào / bán ra (kể cả hóa đơn khởi tạo từ máy tính tiền) theo khoảng ngày (tự chia theo tháng, tối đa 31 ngày/lần).
+  - Đóng gói ZIP theo thư mục:  Mua_vao|Ban_ra / YYYY-MM / KyHieu_SoHD_MST / (file XML, HTML... do cổng trả về).
+    Mỗi gói tối đa 200 hóa đơn (nhiều hóa đơn sẽ tách phan1, phan2...).
+  - Excel tổng hợp (STT, ký hiệu, số HĐ, ngày lập, bên bán/mua, tiền chưa thuế, thuế, tổng, trạng thái...) có dòng Tổng cộng.
+  - Tạm dừng / Dừng / Tiếp tục. Tiến độ được lưu tạm trong trình duyệt: lỡ đóng tab hay bị dừng vẫn tiếp tục được,
+    hóa đơn nào đã tải XML rồi thì không tải lại.
+  - NỐI TỰ ĐỘNG VỚI eTAX MANAGER: khi eTax (Chay-eTax.bat) đang chạy, tiện ích tự nhận "lệnh đồng bộ" từ eTax, tải danh sách
+    + XML gốc rồi đẩy về eTax (kèm chi tiết hàng hóa). Không cần bấm gì ở trang Thuế (tắt được bằng ô "Tự chạy khi eTax Manager ra lệnh").
+  - PDF/HTML thể hiện hóa đơn: HTML đã nằm sẵn trong ZIP; chuyển sang PDF: giai đoạn sau.
+
+CÀI ĐẶT (một lần) - CHỈ CÀI MỘT tiện ích eTax; nếu đã cài bản cũ hãy XÓA nó ở chrome://extensions trước.
+  1. Giải nén file ZIP này ra một thư mục cố định (đừng xóa thư mục sau khi cài).
+  2. Chrome: gõ chrome://extensions   (Edge: edge://extensions) rồi Enter.
+  3. Bật "Chế độ nhà phát triển" (góc trên bên phải).
+  4. Bấm "Tải tiện ích đã giải nén" (Load unpacked) và chọn thư mục etax-tai-hoa-don.
+
+SỬ DỤNG
+  1. Vào https://hoadondientu.gdt.gov.vn , TỰ đăng nhập (mật khẩu + mã xác thực).
+  2. Mở menu Tra cứu -> Tra cứu hóa đơn.  (Bắt buộc mở đúng màn hình này.)
+  3. Góc dưới bên phải có hộp "eTax - Tải hóa đơn hàng loạt". Chọn Mua vào/Bán ra, khoảng ngày, XML và/hoặc Excel.
+  4. Bấm Bắt đầu. Chờ xong, các file nằm trong thư mục Tải xuống.
+     Nếu Chrome hỏi "cho phép tải nhiều file" thì chọn Cho phép.
+  Nối eTax: mở eTax bằng Chay-eTax.bat -> Đăng nhập -> "Dùng phiên này để đồng bộ" -> Đồng bộ dữ liệu -> Bắt đầu.
+  Giữ tab Thuế mở ở Tra cứu -> Tra cứu hóa đơn; tiện ích tự chạy. Hộp hiện dòng "eTax Manager: đã kết nối" khi nối được.
+  Tốc độ: khoảng 1 giây/hóa đơn (1.000 hóa đơn ~ 20-25 phút). Nên chia theo tháng hoặc quý.
+
+NẾU BỊ CHẶN
+  Tiện ích dừng ngay, giữ tiến độ và báo rõ, KHÔNG thử cách khác. Hãy chờ một lúc rồi bấm "Tiếp tục việc dở".
+  Đừng bấm liên tục. Nếu vẫn bị chặn, dùng nút xuất Excel/XML thủ công của trang Thuế.
+
+BẢO MẬT
+  - Không đọc, không lưu, không gửi mật khẩu. Token đăng nhập chỉ dùng tại chỗ trong trang Thuế.
+  - Không gửi dữ liệu ra ngoài. Chỉ giao tiếp với hoadondientu.gdt.gov.vn (quyền duy nhất của extension).
+  - "Xóa dữ liệu tạm" trong hộp sẽ xóa các file XML đã lưu tạm trong trình duyệt.
+
+GHI CHÚ KỸ THUẬT
+  - Cách gọi API khớp với chính trang Thuế (đo trực tiếp ngày 20/09/2026): địa chỉ /api/query/invoices/{purchase|sold|export-xml},
+    size=15, sort=tdlap:desc, phân trang bằng state=..., và các header mô tả thao tác Action / End-Point / request-id / Accept-Language.
+  - Đã kiểm chứng trên cổng thật: tìm kiếm mua vào/bán ra, phân trang, export-xml (trả file ZIP), detail;
+    hóa đơn máy tính tiền: danh sách /api/sco-query/invoices/{sold|purchase} và export-xml (ZIP, cùng cấu trúc XML).
+  - Chưa gọi thử trên cổng thật: XML của hóa đơn bán ra THƯỜNG (nhãn Action có trong mã nguồn trang Thuế nhưng không có hóa đơn mẫu).
+    Nếu bị từ chối, hãy báo lại để chỉnh.
+  - Chọn "Mua vào - máy tính tiền" / "Bán ra - máy tính tiền" trong hộp để tải riêng loại này; khi nối eTax, ô "Lấy thêm hóa đơn khởi tạo từ máy tính tiền" trong eTax quyết định.
