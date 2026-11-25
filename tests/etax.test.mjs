@@ -21,6 +21,7 @@ import * as syncEngine from '../js/core/syncEngine.js';
 import * as backup from '../js/core/backup.js';
 import { zip, unzip } from '../js/core/zip.js';
 import * as syncSession from '../js/core/syncSession.js';
+import { invoiceHtml } from '../js/export.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -227,4 +228,29 @@ test('extension/manifest.json: valid MV3 manifest targeting gdt portal and 127.0
   const pkg = JSON.parse(await readFile(path.join(ROOT, 'package.json'), 'utf8'));
   assert.equal(APP.version, pkg.version);
   assert.equal(mf.version, pkg.version);
+});
+
+test('export/invoiceHtml: renders official GDT form layout and escapes HTML', () => {
+  const html = invoiceHtml({
+    template: '1',
+    series: 'C26TAA',
+    number: '123',
+    date: '2026-11-25',
+    sellerName: 'Công ty <ABC>',
+    sellerTax: '0123456789',
+    buyerName: 'Khách hàng XYZ',
+    buyerTax: '0987654321',
+    net: 1000000,
+    vat: 100000,
+    total: 1100000,
+    totalInWords: 'Một triệu một trăm nghìn đồng',
+    hasSignature: true,
+    items: [{ stt: 1, name: 'Dịch vụ A', unit: 'Lần', qty: 1, price: 1000000, amount: 1000000, rate: '10', tax: 100000 }],
+  });
+  assert.ok(html.includes('Ngày 25 tháng 11 năm 2026'));
+  assert.ok(html.includes('0000123'));
+  assert.ok(html.includes('Signature Valid'));
+  assert.ok(html.includes('(6) = (4)x(5)'));
+  assert.ok(html.includes('Công ty &lt;ABC&gt;'));
+  assert.ok(!html.includes('Công ty <ABC>'));
 });
