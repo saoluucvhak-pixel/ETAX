@@ -46,6 +46,20 @@ export async function incrementalRange(companyTax, direction, fallbackFrom) {
   return [from, todayISO()];
 }
 
+/** Ghi mốc đồng bộ gia tăng cho một (doanh nghiệp, chiều) — dùng chung cho cả API trực tiếp và cầu nối. */
+export async function checkpointSync({ companyTax, direction, from, to, count, mode }) {
+  return repos.syncState.put({
+    key: SyncStateRepository.makeKey(companyTax, direction),
+    companyTax,
+    direction,
+    lastSyncAt: Date.now(),
+    lastFrom: from,
+    lastTo: to,
+    lastCount: count,
+    mode,
+  });
+}
+
 /**
  * Chạy đồng bộ.
  * @param {object} o
@@ -94,7 +108,7 @@ export async function runSync(o) {
         report(pct, `${label}: ${page.chunk[0]} → ${page.chunk[1]}`, `Đã tải ${counts.fetched.toLocaleString('vi-VN')} hóa đơn (mới ${counts.added}, cập nhật ${counts.updated})`, result.fetched + counts.fetched);
       }
 
-      await repos.syncState.put({ key: SyncStateRepository.makeKey(companyTax, direction), companyTax, direction, lastSyncAt: Date.now(), lastFrom: from, lastTo: to, lastCount: counts.fetched, mode });
+      await checkpointSync({ companyTax, direction, from, to, count: counts.fetched, mode });
       result.added += counts.added; result.updated += counts.updated; result.fetched += counts.fetched;
       await logger.info('sync', `Xong hóa đơn ${label.toLowerCase()}: ${counts.fetched} hóa đơn (mới ${counts.added}, cập nhật ${counts.updated})`, { direction, ...counts });
       bus.emit('invoices:change', { companyTax });
@@ -118,11 +132,12 @@ export async function runSync(o) {
   }
 }
 
-/** Tải chi tiết hàng hóa cho các hóa đơn chưa có (song song 2 luồng, đã có giãn cách trong client). */
+/** Tải chi tiết hàng hóa cho các hóa đơn chưa có (số luồng cấu hình từ Cài đặt, đã có giãn cách trong client). */
 async function fetchDetails(client, invoices, companyTax, result, report, signal, base) {
   const need = invoices.filter((i) => !i.items?.length && i.status !== 6);
+  const concurrency = Math.max(1, Math.min(6, Number(state.settings?.detailConcurrency) || 2));
   let done = 0;
-  await pool(need, 2, async (inv) => {
+  await pool(need, concurrency, async (inv) => {
     if (signal?.aborted) throw new DOMException('Đã hủy', 'AbortError');
     try {
       const det = detailFromGdt(await client.detail(inv, signal));

@@ -74,7 +74,13 @@ function proxy(req, res) {
 
 /** Phục vụ tệp tĩnh, chặn thoát khỏi thư mục dự án và không phục vụ các thư mục nội bộ. */
 async function serveStatic(req, res) {
-  let rel = decodeURIComponent(new URL(req.url, 'http://x').pathname);
+  let rel;
+  try {
+    rel = decodeURIComponent(new URL(req.url, 'http://x').pathname);
+  } catch {
+    res.writeHead(400, { 'content-type': 'text/plain; charset=utf-8' });
+    return res.end('Bad Request');
+  }
   if (rel.endsWith('/')) rel += 'index.html';
   const file = path.resolve(ROOT, `.${rel}`);
   const blocked = /^(server|electron|tests|node_modules|\.git)([\\/]|$)/.test(path.relative(ROOT, file));
@@ -120,7 +126,12 @@ async function bridge(req, res) {
     res.writeHead(code, h); res.end(JSON.stringify(obj));
   };
   if (req.method === 'OPTIONS') return send(204, {});
-  const route = new URL(req.url, 'http://x').pathname.replace('/__bridge/', '');
+  let route;
+  try {
+    route = new URL(req.url, 'http://x').pathname.replace('/__bridge/', '');
+  } catch {
+    return send(400, { error: 'bad url' });
+  }
   // Yêu cầu từ trang web khác (có Origin là web) bị từ chối; tiện ích chạy nền có thể không gửi Origin nên chấp nhận khi vắng Origin.
   // Mọi lệnh của tiện ích vẫn cần mã ghép cặp, mà mã này trình duyệt không cho trang web khác đọc (không có CORS).
   const app = isAppRequest(req);

@@ -7,10 +7,10 @@
  * Ứng dụng không bao giờ thấy mật khẩu hay token của trang Thuế.
  */
 import { DIRECTION, DIRECTION_LABEL } from '../config.js';
-import { repos, SyncStateRepository } from '../storage.js';
+import { repos } from '../storage.js';
 import { bus, state } from './state.js';
 import { fromGdtSummary } from './normalizer.js';
-import { incrementalRange } from './syncEngine.js';
+import { incrementalRange, checkpointSync } from './syncEngine.js';
 import { saveBridgeXml } from './xmlImport.js';
 import { logger } from '../logger.js';
 import { sleep, todayISO } from '../utils.js';
@@ -88,7 +88,7 @@ export async function runBridgeSync(o) {
       const checkpointListIfDone = async (pPct) => {
         if (listSaved || !(sawXml || (pPct || 0) >= listW)) return;
         listSaved = true;
-        await repos.syncState.put({ key: SyncStateRepository.makeKey(companyTax, direction), companyTax, direction, lastSyncAt: Date.now(), lastFrom: from, lastTo: to, lastCount: counts.fetched, mode });
+        await checkpointSync({ companyTax, direction, from, to, count: counts.fetched, mode });
         await logger.info('sync', `Đã chốt mốc liệt kê xong ${label.toLowerCase()} (qua trang Thuế): ${counts.fetched} hóa đơn ${from} → ${to}`, { direction, from, to });
       };
       result.byDirection[direction] = counts;
@@ -121,7 +121,7 @@ export async function runBridgeSync(o) {
           }
         }
       }
-      await repos.syncState.put({ key: SyncStateRepository.makeKey(companyTax, direction), companyTax, direction, lastSyncAt: Date.now(), lastFrom: from, lastTo: to, lastCount: counts.fetched, mode });
+      await checkpointSync({ companyTax, direction, from, to, count: counts.fetched, mode });
       result.added += counts.added; result.updated += counts.updated; result.fetched += counts.fetched; result.detailed += counts.xml;
       await logger.info('sync', `Xong hóa đơn ${label.toLowerCase()} (qua trang Thuế): ${counts.fetched} hóa đơn (mới ${counts.added}, cập nhật ${counts.updated})${xml ? `, ${counts.xml} XML` : ''}`, { direction, ...counts });
       bus.emit('invoices:change', { companyTax });

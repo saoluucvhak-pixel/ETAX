@@ -207,8 +207,10 @@ export function chunk(arr, size) {
 /** Chạy tối đa `limit` tác vụ song song. */
 export async function pool(items, limit, worker) {
   const results = new Array(items.length);
+  if (!items.length) return results;
   let i = 0;
-  const runners = Array.from({ length: Math.min(limit, items.length) }, async () => {
+  const concurrency = Math.max(1, Math.min(items.length, Number(limit) || 1));
+  const runners = Array.from({ length: concurrency }, async () => {
     while (i < items.length) {
       const idx = i++;
       results[idx] = await worker(items[idx], idx);
