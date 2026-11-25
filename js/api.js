@@ -225,9 +225,12 @@ export class GdtClient {
   setToken(t) { this.token = t; }
 
   async _throttle() {
-    const wait = this._last + this.minGapMs - Date.now();
+    const gap = Math.max(0, Number(state.settings?.apiGapMs ?? this.minGapMs) || 0);
+    const now = Date.now();
+    const slot = Math.max(now, this._last + gap);
+    this._last = slot;
+    const wait = slot - now;
     if (wait > 0) await sleep(wait);
-    this._last = Date.now();
   }
 
   _auth() { return this.token ? { Authorization: `Bearer ${this.token}` } : {}; }

@@ -32,6 +32,8 @@ export async function mount(host) {
   const auto = h('input', { type: 'checkbox', checked: !!s.autoSync, onchange: (e) => { saveSettings({ autoSync: e.target.checked }); touchAutoSync(); } });
   const interval = select([['15', '15 phút'], ['30', '30 phút'], ['60', '1 giờ'], ['180', '3 giờ'], ['360', '6 giờ'], ['720', '12 giờ']], String(s.syncIntervalMin), { onchange: (e) => { saveSettings({ syncIntervalMin: Number(e.target.value) }); touchAutoSync(); } });
   const detail = h('input', { type: 'checkbox', checked: !!s.syncDetail, onchange: (e) => saveSettings({ syncDetail: e.target.checked }) });
+  const detailConcurrency = select([['1', '1 luồng (chậm, an toàn)'], ['2', '2 luồng (mặc định)'], ['3', '3 luồng'], ['4', '4 luồng'], ['6', '6 luồng (nhanh)']], String(s.detailConcurrency ?? 2), { onchange: (e) => saveSettings({ detailConcurrency: Number(e.target.value) }) });
+  const apiGapMs = select([['100', '100 ms'], ['250', '250 ms (mặc định)'], ['500', '500 ms'], ['1000', '1.000 ms (chậm, an toàn)']], String(s.apiGapMs ?? 250), { onchange: (e) => saveSettings({ apiGapMs: Number(e.target.value) }) });
 
   // ------------------------------------------------------------ Thư mục lưu
   const folderName = h('span', s.saveFolderName || 'Chưa chọn — tệp sẽ tải xuống thư mục Downloads');
@@ -146,7 +148,7 @@ export async function mount(host) {
   host.append(h('div.settings-grid',
     card('Giao diện', null, row('Chế độ màu', 'Sáng, tối hoặc theo hệ điều hành', theme), row('Ngôn ngữ', 'Menu và tiêu đề trang', lang), row('Số dòng mỗi trang (in)', 'Áp dụng cho bản in', pageSize),
       row('Loại hóa đơn hủy khỏi số liệu', 'Hóa đơn hủy / bị thay thế không tính vào báo cáo', excl)),
-    card('Đồng bộ tự động', 'Chỉ chạy khi trang đang mở và phiên còn hợp lệ', row('Tự động đồng bộ', 'Tải phần mới của cả hai chiều', auto), row('Chu kỳ', null, interval), row('Tải chi tiết hàng hóa', 'Đầy đủ hơn nhưng chậm hơn', detail)),
+    card('Đồng bộ tự động', 'Chỉ chạy khi trang đang mở và phiên còn hợp lệ', row('Tự động đồng bộ', 'Tải phần mới của cả hai chiều', auto), row('Chu kỳ', null, interval), row('Tải chi tiết hàng hóa', 'Đầy đủ hơn nhưng chậm hơn', detail), row('Số luồng tải chi tiết', 'Tăng luồng giúp tải nhanh hơn nhưng dễ bị cổng Thuế giới hạn', detailConcurrency), row('Giãn cách gọi cổng Thuế', 'Thời gian nghỉ tối thiểu giữa các yêu cầu API', apiGapMs)),
     card('Thư mục lưu tệp', 'Nơi lưu Excel, PDF, XML, sao lưu', row('Thư mục hiện tại', isElectron() ? 'Ứng dụng máy tính ghi thẳng vào thư mục này' : supportsFolderPicker() ? 'Trình duyệt sẽ hỏi quyền ghi' : 'Trình duyệt không hỗ trợ chọn thư mục, tệp sẽ tải xuống', h('div', { style: { textAlign: 'right', display: 'grid', gap: '6px', justifyItems: 'end' } }, folderName, folderBtns))),
     card('Kết nối cổng Thuế', 'Chỉ đổi khi cổng Thuế thay đổi địa chỉ hoặc bạn dùng máy chủ riêng', row('Kênh kết nối', 'Trình duyệt thường cần máy chủ trung gian (server/server.mjs) do chính sách CORS', transport),
       row('Địa chỉ API cổng Thuế', 'Tự động: thử cách đặt đường dẫn mới (/api) rồi cách cũ (:30000)', profile), custom,

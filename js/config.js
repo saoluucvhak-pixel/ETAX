@@ -91,6 +91,8 @@ export const DEFAULT_SETTINGS = Object.freeze({
   autoSync: false,
   syncIntervalMin: 60,
   syncDetail: false, // tải luôn chi tiết hàng hóa khi đồng bộ
+  detailConcurrency: 2, // số luồng tải chi tiết hàng hóa song song (1–6)
+  apiGapMs: 250, // giãn cách tối thiểu giữa các lần gọi cổng Thuế (ms)
   transport: 'auto', // auto | electron | proxy | direct
   gdtProfile: 'auto', // auto | api | legacy | custom
   baseUrl: 'https://hoadondientu.gdt.gov.vn', // chỉ dùng khi gdtProfile = custom
