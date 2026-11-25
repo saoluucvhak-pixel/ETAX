@@ -23,19 +23,36 @@
     });
   }
 
+  function extractJwt(val) {
+    if (typeof val !== 'string') return '';
+    const s = val.trim().replace(/^"|"$/g, '').replace(/^Bearer\s+/i, '');
+    if (/^eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(s)) return s;
+    return '';
+  }
+
+  function findJwtInObj(obj, depth = 0) {
+    if (!obj || typeof obj !== 'object' || depth > 3) return '';
+    for (const v of Object.values(obj)) {
+      const hit = extractJwt(v);
+      if (hit) return hit;
+      if (v && typeof v === 'object') {
+        const nested = findJwtInObj(v, depth + 1);
+        if (nested) return nested;
+      }
+    }
+    return '';
+  }
+
   function findJwtInStorage(store) {
     try {
       for (let i = 0; i < store.length; i++) {
-        const k = store.key(i);
-        const v = store.getItem(k) || '';
-        if (/^eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(v.replace(/^"|"$/g, ''))) {
-          return v.replace(/^"|"$/g, '');
-        }
-        if (v.startsWith('{')) {
+        const v = store.getItem(store.key(i)) || '';
+        const direct = extractJwt(v);
+        if (direct) return direct;
+        if (v.startsWith('{') || v.startsWith('[')) {
           try {
-            const obj = JSON.parse(v);
-            const t = obj.token || obj.access_token || obj.jwt;
-            if (typeof t === 'string' && t.startsWith('eyJ')) return t;
+            const hit = findJwtInObj(JSON.parse(v));
+            if (hit) return hit;
           } catch { /* bỏ qua */ }
         }
       }
@@ -43,8 +60,21 @@
     return '';
   }
 
+  function findJwtInCookie() {
+    try {
+      for (const part of (document.cookie || '').split(';')) {
+        const idx = part.indexOf('=');
+        if (idx < 0) continue;
+        const val = decodeURIComponent(part.slice(idx + 1).trim());
+        const hit = extractJwt(val);
+        if (hit) return hit;
+      }
+    } catch { /* bỏ qua */ }
+    return '';
+  }
+
   function getPortalToken() {
-    const t = findJwtInStorage(localStorage) || findJwtInStorage(sessionStorage);
+    const t = findJwtInStorage(localStorage) || findJwtInStorage(sessionStorage) || findJwtInCookie();
     if (t) cachedToken = t;
     return t || cachedToken;
   }
@@ -76,22 +106,20 @@
   }
 
   async function fetchProfile() {
-    const token = getPortalToken();
-    if (!token) {
-      cachedProfile = null;
-      return { loggedIn: false, mst: '', user: '' };
-    }
-    if (cachedProfile?.mst) return { loggedIn: true, ...cachedProfile };
+    if (cachedProfile?.mst && getPortalToken()) return { loggedIn: true, ...cachedProfile };
     try {
       const j = await portalFetch('/security-taxpayer/profile', { timeoutMs: 12000 });
       const d = j?.data || j || {};
-      cachedProfile = {
-        mst: String(d.mst || d.tin || d.taxCode || d.username || ''),
-        user: String(d.hoTen || d.fullName || d.ten || d.username || ''),
-      };
+      const mst = String(d.mst || d.tin || d.taxCode || d.username || '');
+      const user = String(d.hoTen || d.fullName || d.ten || d.username || '');
+      if (!mst && !user) {
+        cachedProfile = null;
+        return { loggedIn: false, mst: '', user: '' };
+      }
+      cachedProfile = { mst, user };
       return { loggedIn: true, ...cachedProfile };
     } catch (e) {
-      if (e.status === 401 || e.status === 403) {
+      if (e.status === 401 || e.status === 403 || !getPortalToken()) {
         cachedProfile = null;
         return { loggedIn: false, mst: '', user: '' };
       }
