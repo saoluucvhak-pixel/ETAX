@@ -1,6 +1,6 @@
 {
   "name": "etax-manager",
-  "version": "1.3.12",
+  "version": "1.3.13",
   "description": "Quản lý hóa đơn điện tử và làm việc với cổng Thuế điện tử (Web / PWA / Electron)",
   "main": "electron/main.cjs",
   "type": "module",

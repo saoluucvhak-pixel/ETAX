@@ -233,9 +233,10 @@ test('extension/manifest.json: valid MV3 manifest targeting gdt portal and 127.0
 test('export/invoiceHtml: renders official GDT form layout and escapes HTML', () => {
   const html = invoiceHtml({
     template: '1',
-    series: 'C26TAA',
-    number: '123',
-    date: '2026-11-25',
+    series: 'C26TTH',
+    number: '2270',
+    date: '2026-11-17',
+    invoiceCode: '0092519F1D026D4F4D963BE693BC4CE8AF',
     sellerName: 'Công ty <ABC>',
     sellerTax: '0123456789',
     buyerName: 'Khách hàng XYZ',
@@ -245,12 +246,13 @@ test('export/invoiceHtml: renders official GDT form layout and escapes HTML', ()
     total: 1100000,
     totalInWords: 'Một triệu một trăm nghìn đồng',
     hasSignature: true,
-    items: [{ stt: 1, name: 'Dịch vụ A', unit: 'Lần', qty: 1, price: 1000000, amount: 1000000, rate: '10', tax: 100000 }],
+    items: [{ stt: 1, kind: 1, name: 'Dịch vụ A', unit: 'Lần', qty: 1, price: 1000000, amount: 1000000, rate: '10', tax: 100000 }],
   });
-  assert.ok(html.includes('Ngày 25 tháng 11 năm 2026'));
-  assert.ok(html.includes('0000123'));
+  assert.ok(html.includes('Ngày 17 tháng 11 năm 2026'));
+  assert.ok(html.includes('MCCQT: 0092519F1D026D4F4D963BE693BC4CE8AF'));
   assert.ok(html.includes('Signature Valid'));
-  assert.ok(html.includes('(6) = (4)x(5)'));
+  assert.ok(html.includes('Tổng tiền thanh toán bằng số'));
+  assert.ok(html.includes('Thông tin quan trọng cho người nước ngoài'));
   assert.ok(html.includes('Công ty &lt;ABC&gt;'));
   assert.ok(!html.includes('Công ty <ABC>'));
 });
