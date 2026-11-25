@@ -42,6 +42,7 @@ function registerIpc(getWin) {
   ipcMain.handle('etax:clearFolder', () => { const c = readConfig(); delete c.saveDir; writeConfig(c); return true; });
 
   ipcMain.handle('etax:saveFile', async (_e, { name, dataBase64 }) => {
+    if (typeof dataBase64 !== 'string') throw new Error('Dữ liệu tệp không hợp lệ');
     const target = await resolveTarget(getWin(), name);
     if (!target) return null;
     fs.writeFileSync(target, Buffer.from(dataBase64, 'base64'));
@@ -49,21 +50,25 @@ function registerIpc(getWin) {
   });
 
   ipcMain.handle('etax:request', async (_e, { method = 'GET', url, headers = {}, body = null, timeoutMs = 45000 }) => {
+    const safeMethod = String(method || 'GET').toUpperCase();
+    if (!['GET', 'POST', 'HEAD'].includes(safeMethod)) throw new Error(`Phương thức HTTP không được phép: ${safeMethod}`);
     const u = new URL(url);
     if (u.protocol !== 'https:' || !ALLOWED_HOSTS.has(u.hostname)) throw new Error(`Không được phép gọi tới ${u.hostname}`);
+    const safeTimeout = Math.max(1000, Math.min(120000, Number(timeoutMs) || 45000));
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+    const timer = setTimeout(() => ctrl.abort(), safeTimeout);
     try {
-      const res = await net.fetch(url, { method, headers, body: body ?? undefined, signal: ctrl.signal });
+      const res = await net.fetch(url, { method: safeMethod, headers, body: body ?? undefined, signal: ctrl.signal });
       const buf = Buffer.from(await res.arrayBuffer());
       return { status: res.status, headers: Object.fromEntries(res.headers.entries()), bodyBase64: buf.toString('base64') };
     } finally { clearTimeout(timer); }
   });
 
   ipcMain.handle('etax:printPdf', async (_e, { html, name, landscape }) => {
+    if (typeof html !== 'string') throw new Error('Nội dung HTML không hợp lệ');
     const target = await resolveTarget(getWin(), name);
     if (!target) return null;
-    const hidden = new BrowserWindow({ show: false, webPreferences: { sandbox: true } });
+    const hidden = new BrowserWindow({ show: false, webPreferences: { sandbox: true, javascript: false } });
     try {
       await hidden.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
       const pdf = await hidden.webContents.printToPDF({ landscape: !!landscape, printBackground: true, pageSize: 'A4', preferCSSPageSize: true });

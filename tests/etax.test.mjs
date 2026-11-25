@@ -17,6 +17,7 @@ import { DEFAULT_SETTINGS } from '../js/config.js';
 import { state } from '../js/core/state.js';
 import { GdtClient } from '../js/api.js';
 import * as syncEngine from '../js/core/syncEngine.js';
+import * as backup from '../js/core/backup.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -114,4 +115,17 @@ test('server.mjs: handles malformed URLs with 400 and blocks internal dirs with 
   } finally {
     proc.kill('SIGTERM');
   }
+});
+
+test('backup: computeBackupSha256 & validateBackupPayload enforce fail-closed integrity', async () => {
+  assert.equal(typeof backup.computeBackupSha256, 'function');
+  assert.equal(typeof backup.validateBackupPayload, 'function');
+
+  const stores = { invoices: [{ key: 'k1', total: 1000 }], settings: [] };
+  const sha256 = await backup.computeBackupSha256(stores);
+  assert.match(sha256, /^[0-9a-f]{64}$/);
+
+  await assert.doesNotReject(() => backup.validateBackupPayload({ app: 'etax-manager', schemaVersion: 1, stores, sha256 }));
+  await assert.rejects(() => backup.validateBackupPayload({ app: 'etax-manager', schemaVersion: 1, stores: { invoices: 'bad' }, sha256 }), /không hợp lệ/i);
+  await assert.rejects(() => backup.validateBackupPayload({ app: 'etax-manager', schemaVersion: 1, stores, sha256: '0'.repeat(64) }), /toàn vẹn|SHA-256/i);
 });
