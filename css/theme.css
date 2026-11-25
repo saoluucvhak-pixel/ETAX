@@ -1,0 +1,134 @@
+/**
+ * theme.css — Biến thiết kế (màu, chữ, khoảng cách) cho chế độ sáng và tối.
+ *
+ * Giao diện HAK Group: xanh ngọc #0e7c86 làm màu chính, thanh bên gradient xanh đen, thẻ bo góc 14px có bóng nhẹ,
+ * màu đỏ chỉ dùng cho trạng thái lỗi/hủy.
+ * Dòng tổng luôn gạch đôi như sổ sách kế toán thật.
+ *
+ * Chế độ: html[data-theme="light"|"dark"]. Giá trị "auto" do app.js quy đổi theo hệ điều hành.
+ */
+:root {
+  color-scheme: light;
+
+  /* Giấy & mực */
+  --paper: #f3f6fa;
+  --surface: #ffffff;
+  --surface-2: #f6f8fb;
+  --surface-sunk: #eaeff5;
+  --line: #e3e9f0;
+  --line-strong: #c5cfdb;
+  --ink: #14202e;
+  --ink-2: #485a6f;
+  --ink-3: #62728a;
+
+  /* Màu chính: mực xanh */
+  --primary: #0e7c86;
+  --primary-solid: #0e7c86;
+  --primary-hover: #0b6870;
+  --primary-tint: #dff0f1;
+  --on-primary: #ffffff;
+  --focus: #14a3ad;
+
+  /* Con dấu đỏ */
+  --seal: #b42f27;
+  --seal-tint: #f7e4e2;
+
+  /* Ngữ nghĩa */
+  --ok: #1f7a55;
+  --ok-tint: #dcf0e6;
+  --warn: #8f5c0e;
+  --warn-tint: #f8ecd2;
+  --bad: #b42f27;
+  --bad-tint: #f7e4e2;
+  --info: #2a6299;
+  --info-tint: #dfeaf6;
+  --muted-tint: #e6ebf1;
+
+  /* Gáy sổ (thanh bên) */
+  --spine: #0f2740;
+  --spine-2: rgba(255, 255, 255, .08);
+  --spine-ink: #c3d0e0;
+  --spine-ink-2: #8ea0b5;
+  --spine-line: rgba(255, 255, 255, .1);
+
+  /* Biểu đồ */
+  --series-1: #0e7c86;
+  --series-2: #c98a1b;
+  --series-3: #2f8f6b;
+  --series-4: #b42f27;
+  --series-5: #6e4c9a;
+  --series-6: #7a8797;
+
+  /* Chữ */
+  --font-ui: "Segoe UI Variable Text", "Segoe UI", "SF Pro Text", -apple-system, "Helvetica Neue", "Noto Sans", Roboto, Arial, sans-serif;
+  --font-title: var(--font-ui);
+  --fs-xs: 12px;
+  --fs-sm: 13px;
+  --fs-md: 14px;
+  --fs-lg: 16px;
+  --fs-xl: 24px;
+
+  /* Hình khối */
+  --r-ctl: 8px;
+  --r-panel: 14px;
+  --r-tag: 6px;
+  --shadow-pop: 0 12px 32px rgba(16, 35, 58, .2), 0 2px 6px rgba(16, 35, 58, .12);
+  --brand-2: #14a3ad;
+  --spine-bg: linear-gradient(180deg, #0f2740 0%, #0a1c30 100%);
+  --shadow: 0 1px 2px rgba(16, 35, 58, .05), 0 6px 18px rgba(16, 35, 58, .06);
+  --hero-bg: radial-gradient(1200px 300px at 90% -20%, rgba(255, 255, 255, .18), transparent 60%), linear-gradient(120deg, #0f2740, #0e7c86);
+  --sidebar-w: 260px;
+  --topbar-h: 64px;
+  --ease: cubic-bezier(.2, .7, .2, 1);
+}
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --paper: #0d151e;
+  --surface: #15202c;
+  --surface-2: #1a2836;
+  --surface-sunk: #101923;
+  --line: #243244;
+  --line-strong: #36485e;
+  --ink: #e4ecf5;
+  --ink-2: #a7b5c7;
+  --ink-3: #8495aa;
+
+  --primary: #3cc3cd;
+  --primary-solid: #14a3ad;
+  --primary-hover: #2bb6c0;
+  --primary-tint: #12343b;
+  --on-primary: #062c30;
+  --focus: #47c8d1;
+
+  --seal: #ee7b72;
+  --seal-tint: #3a2028;
+
+  --ok: #5cbd94;
+  --ok-tint: #15332a;
+  --warn: #e3ac4a;
+  --warn-tint: #3a2e14;
+  --bad: #ee7b72;
+  --bad-tint: #3a2028;
+  --info: #7db4ec;
+  --info-tint: #16293f;
+  --muted-tint: #1f2c3b;
+
+  --spine: #0a1826;
+  --spine-2: rgba(255, 255, 255, .07);
+  --spine-ink: #c3d0e0;
+  --spine-ink-2: #8395ab;
+  --spine-line: rgba(255, 255, 255, .08);
+
+  --series-1: #3cc3cd;
+  --series-2: #e0a93b;
+  --series-3: #56b58d;
+  --series-4: #e4675e;
+  --series-5: #a98bdb;
+  --series-6: #97a3b5;
+
+  --shadow-pop: 0 14px 36px rgba(0, 0, 0, .55), 0 2px 8px rgba(0, 0, 0, .4);
+  --spine-bg: linear-gradient(180deg, #0a1826 0%, #071019 100%);
+  --shadow: 0 1px 2px rgba(0, 0, 0, .35), 0 8px 22px rgba(0, 0, 0, .3);
+  --hero-bg: radial-gradient(1200px 300px at 90% -20%, rgba(255, 255, 255, .1), transparent 60%), linear-gradient(120deg, #0a1826, #0b5f68);
+}
