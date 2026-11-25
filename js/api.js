@@ -308,8 +308,8 @@ export class GdtClient {
   async* iterateInvoices({ direction, from, to, codeMode = 'all', pos = false, number, series, partnerTax, partnerName, signal, onRetry }) {
     const passes = [{ path: direction === DIRECTION.OUT ? GDT.paths.sold : GDT.paths.purchase, mode: codeMode, isPos: false }];
     if (pos) passes.push({ path: direction === DIRECTION.OUT ? GDT.paths.scoSold : GDT.paths.scoPurchase, mode: 'all', isPos: true });
-    const chunks = splitDateRange(from, to, GDT.maxRangeDays);
     for (const pass of passes) {
+      const chunks = splitDateRange(from, to, pass.isPos ? 10 : GDT.maxRangeDays);
       for (let ci = 0; ci < chunks.length; ci++) {
         const [f, t] = chunks[ci];
         const modes = pass.mode === 'all' ? ['all'] : [pass.mode];

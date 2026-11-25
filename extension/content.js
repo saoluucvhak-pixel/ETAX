@@ -489,8 +489,9 @@
           // quả của các mã/lượt khác đã liệt kê tốt, không để lan ra làm mất trắng toàn bộ lệnh đồng bộ.
           onCodeBusy: async (code, e) => {
             const label = CODE_LABEL[code] ? ` — ${CODE_LABEL[code]}` : '';
-            skipped.push(`${pdir.name}${label}`);
-            const text = `${pdir.name}${label}: bỏ qua do cổng Thuế liên tục báo bận (đã thử ${BUSY_ATTEMPTS} lần) — giữ lại phần đã liệt kê được`;
+            const reason = e?.message || 'cổng Thuế báo bận';
+            skipped.push(`${pdir.name}${label} (${reason})`);
+            const text = `${pdir.name}${label}: bỏ qua (${reason}) — giữ lại phần đã liệt kê được`;
             setMsg(text, '', 'bad'); await report('running', text);
           },
         });
