@@ -92,11 +92,12 @@
 
   async function portalFetch(path, { timeoutMs = 45000, responseType = 'json' } = {}) {
     const token = getPortalToken();
+    const defaults = location.port === '30000'
+      ? [location.origin, 'https://hoadondientu.gdt.gov.vn/api']
+      : [`${location.origin}/api`, 'https://hoadondientu.gdt.gov.vn:30000'];
     const candidates = cachedApiBase
-      ? [cachedApiBase]
-      : location.port === '30000'
-        ? [location.origin, 'https://hoadondientu.gdt.gov.vn/api']
-        : [`${location.origin}/api`, 'https://hoadondientu.gdt.gov.vn:30000'];
+      ? [cachedApiBase, ...defaults.filter((b) => b !== cachedApiBase)]
+      : defaults;
 
     let lastErr;
     for (const base of candidates) {
@@ -113,7 +114,7 @@
           },
         });
         if (!res.ok) {
-          const err = new Error(`HTTP ${res.status}`);
+          const err = new Error(`HTTP ${res.status} (${path.split('?')[0]})`);
           err.status = res.status;
           lastErr = err;
           if (res.status === 401) throw err;
@@ -211,7 +212,9 @@
         return await fn();
       } catch (e) {
         lastErr = e;
-        if (e.status === 401 || e.status === 403) throw e;
+        if (e.status === 401) throw e;
+        if ((e.status === 403 || e.status === 404) && onSkip) return onSkip(e);
+        if (e.status === 403) throw e;
         const max = e.status === 500 ? 2 : 6;
         if (i >= max) {
           if (onSkip && e.status === 500) return onSkip(e);
@@ -226,7 +229,8 @@
   async function runJob(job) {
     running = true;
     setUiStatus(`Đang chạy lệnh (${job.direction === 'out' ? 'Đầu ra' : 'Đầu vào'})…`);
-    const endpoint = job.direction === 'out' ? '/query/invoices/sold' : '/query/invoices/purchase';
+    const baseEp = job.direction === 'out' ? '/query/invoices/sold' : '/query/invoices/purchase';
+    const posEp = job.direction === 'out' ? '/sco-query/invoices/sold' : '/sco-query/invoices/purchase';
     const chunks = splitDateRange(job.from, job.to);
     const ttxlyList = job.codeMode === 'coma'
       ? [5]
@@ -244,6 +248,8 @@
           step++;
           let cursor = null;
           let guard = 0;
+          const endpoint = ttxly === 8 ? posEp : baseEp;
+          const canSkip = ttxly === 8 || (ttxly === 6 && job.codeMode === 'all');
           const search = `tdlap=ge=${gdtStamp(f)};tdlap=le=${gdtStamp(t, true)};ttxly==${ttxly}`;
           do {
             await sleep(GAP_MS);
@@ -252,10 +258,12 @@
             const res = await withPortalRetry(
               () => portalFetch(`${endpoint}?${q.toString()}`),
               {
-                onSkip: () => {
-                  skipped.push(`ttxly=${ttxly} (${f}→${t})`);
-                  return { datas: [], state: null };
-                },
+                onSkip: canSkip
+                  ? (err) => {
+                      skipped.push(`ttxly=${ttxly} (${f}→${t}: ${err.status})`);
+                      return { datas: [], state: null };
+                    }
+                  : undefined,
               },
             );
             const items = res?.datas || res?.data || [];
@@ -274,7 +282,7 @@
       }
 
       const doneMsg = skipped.length
-        ? `Hoàn tất. Đã bỏ qua ${skipped.length} phần lỗi cổng 500: ${skipped.slice(0, 3).join(', ')}`
+        ? `Hoàn tất. Đã bỏ qua ${skipped.length} phần: ${skipped.slice(0, 3).join(', ')}`
         : 'Hoàn tất';
       await bridge('progress', 'POST', { jobId: job.id, state: 'done', pct: 1, message: doneMsg });
       setUiStatus('Hoàn tất lệnh từ eTax');
