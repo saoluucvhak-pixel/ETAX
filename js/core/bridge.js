@@ -19,8 +19,10 @@ const POLL_MS = 1200;
 /** Chuẩn hóa MST để so sánh (bỏ dấu gạch/khoảng trắng, không phân biệt hoa thường). */
 export const normTax = (s) => String(s ?? '').replace(/[^0-9A-Za-z]/g, '').toUpperCase();
 
+const bridgeBase = () => (typeof location !== 'undefined' && location.protocol === 'app:' ? 'http://127.0.0.1:8080' : '');
+
 async function api(method, path, body) {
-  const r = await fetch(`/__bridge/${path}`, { method, headers: body ? { 'Content-Type': 'application/json' } : undefined, body: body ? JSON.stringify(body) : undefined, cache: 'no-store' });
+  const r = await fetch(`${bridgeBase()}/__bridge/${path}`, { method, headers: body ? { 'Content-Type': 'application/json' } : undefined, body: body ? JSON.stringify(body) : undefined, cache: 'no-store' });
   if (!r.ok) throw new Error(`Cầu nối trả lỗi ${r.status}`);
   return r.json();
 }

@@ -8,6 +8,7 @@ const { app, BrowserWindow, dialog, ipcMain, protocol, net, shell } = require('e
 const path = require('node:path');
 const fs = require('node:fs');
 const { pathToFileURL } = require('node:url');
+const { startBridgeServer } = require('./bridgeServer.cjs');
 
 const ROOT = path.resolve(__dirname, '..');
 const ALLOWED_HOSTS = new Set(['hoadondientu.gdt.gov.vn']);
@@ -90,7 +91,10 @@ function createWindow() {
   win.loadURL('app://etax/index.html');
 }
 
+let bridgeServer = null;
+
 app.whenReady().then(() => {
+  bridgeServer = startBridgeServer();
   protocol.handle('app', (req) => {
     const rel = decodeURIComponent(new URL(req.url).pathname);
     const file = path.resolve(ROOT, `.${rel}`);
@@ -101,4 +105,5 @@ app.whenReady().then(() => {
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });
 
+app.on('will-quit', () => { bridgeServer?.close(); });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
