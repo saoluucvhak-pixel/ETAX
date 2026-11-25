@@ -120,106 +120,162 @@ export async function exportInvoicesJson(invoices, { label = 'HoaDon' } = {}) {
 const PRINT_CSS = `
 @page { size: A4; margin: 10mm 12mm; }
 * { box-sizing: border-box; }
-body { font: 11px/1.42 "Times New Roman", "Segoe UI", Arial, sans-serif; color: #111827; margin: 0; }
-h1 { font-size: 16px; margin: 0 0 2px; color: #1e3a8a; }
+body { font: 11px/1.4 "Times New Roman", Times, serif; color: #111; margin: 0; }
+h1 { font-size: 16px; margin: 0 0 2px; color: #111; }
 h2 { font-size: 13px; margin: 14px 0 6px; }
 .sub { color: #5b6778; margin-bottom: 10px; }
 table { border-collapse: collapse; width: 100%; }
-th, td { border: 1px solid #475569; padding: 4px 6px; vertical-align: top; }
-th { background: #f1f5f9; text-align: center; font-weight: 700; }
+th, td { border: 1px solid #222; padding: 3px 5px; vertical-align: middle; }
+th { background: #fff; text-align: center; font-weight: 700; }
 td.r { text-align: right; font-variant-numeric: tabular-nums; }
 td.c { text-align: center; }
-tfoot td { font-weight: 700; background: #f8fafc; }
+tfoot td { font-weight: 700; }
 .page { page-break-after: always; }
 .page:last-child { page-break-after: auto; }
-.gdt-sheet { border: 2px solid #1e3a8a; padding: 12px 14px; position: relative; background: #fff; }
-.gdt-inner { border: 1px solid #94a3b8; padding: 10px 12px; }
-.gdt-head { display: grid; grid-template-columns: 150px 1fr 175px; gap: 10px; align-items: start; border-bottom: 1.5px solid #1e3a8a; padding-bottom: 8px; margin-bottom: 8px; }
-.gdt-title { text-align: center; }
-.gdt-title h1 { font-size: 18px; color: #b91c1c; text-transform: uppercase; letter-spacing: .3px; margin: 0; }
-.gdt-title .gdt-sub { font-size: 11px; font-style: italic; color: #334155; margin-top: 2px; }
-.gdt-title .gdt-date { font-size: 11.5px; margin-top: 4px; font-style: italic; }
-.gdt-meta { font-size: 11px; line-height: 1.55; }
-.gdt-meta .inv-no { color: #b91c1c; font-size: 14px; font-weight: 700; }
-.gdt-box { border-bottom: 1px dashed #94a3b8; padding: 6px 0; margin-bottom: 6px; }
-.gdt-kv { display: grid; grid-template-columns: 145px 1fr; gap: 2px 8px; font-size: 11.5px; }
-.gdt-kv span:nth-child(odd) { color: #334155; }
-.gdt-colnum th { font-size: 10px; font-weight: 400; font-style: italic; padding: 2px 4px; background: #f8fafc; }
-.stamp { display: inline-block; border: 2px solid #b91c1c; color: #b91c1c; padding: 2px 8px; border-radius: 3px; font-weight: 700; font-size: 10px; transform: rotate(-4deg); text-transform: uppercase; }
-.gdt-totals { margin-top: 0; }
-.gdt-totals td { border-top: 0; }
-.words { padding: 6px 8px; border: 1px solid #475569; border-top: 0; font-size: 11.5px; }
-.gdt-signs { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 14px; text-align: center; font-size: 11.5px; }
-.sig-valid { display: inline-block; margin-top: 8px; border: 1.5px solid #16a34a; background: #f0fdf4; color: #15803d; padding: 6px 10px; text-align: left; font-size: 10.5px; line-height: 1.45; min-width: 220px; }
+.gdt-sheet { border: 1px solid #d6c8b8; padding: 12px 14px; background: #fff; }
+.gdt-head { display: grid; grid-template-columns: 120px 1fr 140px; gap: 8px; align-items: start; margin-bottom: 6px; }
+.gdt-meta { font-size: 11px; line-height: 1.5; text-align: left; }
+.gdt-title { text-align: center; padding-top: 6px; }
+.gdt-title h1 { font-size: 17px; font-weight: 700; text-transform: uppercase; margin: 0; letter-spacing: .2px; }
+.gdt-title .gdt-date { font-size: 11px; margin-top: 3px; }
+.gdt-title .gdt-mccqt { font-size: 10.5px; margin-top: 2px; word-break: break-all; }
+.gdt-sec { border-top: 1px solid #555; padding: 5px 0; font-size: 11px; line-height: 1.52; }
+.gdt-line { display: flex; flex-wrap: wrap; gap: 4px 28px; }
+.gdt-tbl { margin-top: 6px; font-size: 10.5px; }
+.gdt-summary { display: grid; grid-template-columns: 40% 58%; justify-content: space-between; gap: 10px; margin-top: 10px; align-items: start; font-size: 10.5px; }
+.gdt-signs { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 16px; text-align: center; font-size: 11px; }
+.sig-valid { display: inline-block; margin-top: 8px; border: 1.5px solid #22c55e; background: #fff; color: #16a34a; padding: 6px 10px; text-align: left; font-size: 10.5px; line-height: 1.45; min-width: 215px; }
 .sig-valid b { display: block; font-size: 11px; margin-bottom: 2px; }
-.foot { margin-top: 12px; padding-top: 6px; border-top: 1px solid #cbd5e1; color: #475569; font-size: 10px; display: flex; justify-content: space-between; gap: 10px; }
+.gdt-note-mid { text-align: center; font-style: italic; font-size: 10.5px; margin-top: 12px; }
+.gdt-foreign { border-top: 1px solid #555; margin-top: 10px; padding-top: 8px; font-size: 10px; line-height: 1.45; }
+.gdt-foreign h3 { text-align: center; font-size: 11.5px; margin: 0 0 6px; }
+.gdt-foreign ul { margin: 0; padding-left: 16px; }
+.stamp { display: inline-block; border: 2px solid #b91c1c; color: #b91c1c; padding: 2px 6px; font-weight: 700; font-size: 9.5px; transform: rotate(-4deg); text-transform: uppercase; }
 `;
+
+const KIND_LABEL = { 1: 'Hàng hóa, dịch vụ', 2: 'Khuyến mại', 3: 'Chiết khấu thương mại', 4: 'Ghi chú, diễn giải' };
 
 function gdtDateWords(iso) {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || '');
   return m ? `Ngày ${m[3]} tháng ${m[2]} năm ${m[1]}` : `Ngày ${fmtDate(iso)}`;
 }
 
-/** HTML "bản thể hiện" hóa đơn điện tử theo mẫu chuẩn Nghị định 123 / cổng Thuế. */
+/** HTML "bản thể hiện" hóa đơn điện tử theo đúng mẫu của Tổng cục Thuế. */
 export function invoiceHtml(inv) {
   const e = escapeHtml;
   const rows = inv.items?.length
-    ? inv.items.map((it, i) => `<tr><td class="c">${e(it.stt || i + 1)}</td><td>${e(it.name)}</td><td class="c">${e(it.unit)}</td><td class="r">${fmtMoney(it.qty)}</td><td class="r">${fmtMoney(it.price)}</td><td class="r">${fmtMoney(it.amount)}</td><td class="c">${e(TAX_RATE_LABEL[it.rate] || it.rate || '')}</td><td class="r">${fmtMoney(it.tax)}</td></tr>`).join('')
-    : `<tr><td colspan="8" class="c" style="color:#64748b;padding:12px">Chưa có chi tiết hàng hóa (mới đồng bộ phần tóm tắt).</td></tr>`;
-  const breakdown = (inv.taxBreakdown || []).map((b) => `<tr><td colspan="5" class="r">Tổng hợp theo thuế suất ${e(TAX_RATE_LABEL[b.rate] || b.rate)}:</td><td class="r">${fmtMoney(b.base)}</td><td class="c">${e(TAX_RATE_LABEL[b.rate] || b.rate)}</td><td class="r">${fmtMoney(b.tax)}</td></tr>`).join('');
+    ? inv.items.map((it, i) => `<tr>
+      <td class="c">${e(it.stt || i + 1)}</td>
+      <td>${e(KIND_LABEL[it.kind] || 'Hàng hóa, dịch vụ')}</td>
+      <td></td>
+      <td>${e(it.name)}</td>
+      <td class="c">${e(it.unit)}</td>
+      <td class="r">${fmtMoney(it.qty)}</td>
+      <td class="r">${fmtMoney(it.price)}</td>
+      <td class="r">${fmtMoney(it.discount || 0)}</td>
+      <td class="c">${e(TAX_RATE_LABEL[it.rate] || it.rate || '')}</td>
+      <td class="r">${fmtMoney(it.amount)}</td>
+    </tr>`).join('')
+    : `<tr><td colspan="10" class="c" style="color:#666;padding:10px">Chưa có chi tiết hàng hóa (mới đồng bộ phần tóm tắt).</td></tr>`;
+
+  const rateRows = (inv.taxBreakdown || []).length
+    ? inv.taxBreakdown.map((b) => `<tr><td class="c">${e(TAX_RATE_LABEL[b.rate] || b.rate)}</td><td class="r">${fmtMoney(b.base)}</td><td class="r">${fmtMoney(b.tax)}</td></tr>`).join('')
+    : `<tr><td class="c">-</td><td class="r">${fmtMoney(inv.net)}</td><td class="r">${fmtMoney(inv.vat)}</td></tr>`;
+
   const showStamp = Number(inv.status) && Number(inv.status) !== 1;
   const sigBox = (inv.hasSignature || inv.invoiceCode)
-    ? `<div class="sig-valid"><b>&#10004; Signature Valid</b><div>Ký bởi: ${e(inv.sellerName || inv.sellerTax)}</div><div>Ký ngày: ${e(fmtDate(inv.date))}</div></div>`
+    ? `<div class="sig-valid"><b>Signature Valid</b><div>Ký bởi ${e(inv.sellerName || inv.sellerTax)}</div><div>Ký ngày: ${e(fmtDate(inv.date))} &#10004;</div></div>`
     : `<div style="height:48px"></div>`;
-  return `<section class="page"><div class="gdt-sheet"><div class="gdt-inner">
+
+  return `<section class="page"><div class="gdt-sheet">
   <div class="gdt-head">
     <div>${showStamp ? `<div class="stamp">${e(INVOICE_STATUS[inv.status]?.label || '')}</div>` : ''}</div>
     <div class="gdt-title">
-      <h1>${e(inv.invoiceName || 'HÓA ĐƠN GIÁ TRỊ GIA TĂNG')}</h1>
-      <div class="gdt-sub">(Bản thể hiện của hóa đơn điện tử)</div>
+      <h1>${e(inv.invoiceName || 'HOÁ ĐƠN GIÁ TRỊ GIA TĂNG')}</h1>
       <div class="gdt-date">${e(gdtDateWords(inv.date))}</div>
+      ${inv.invoiceCode ? `<div class="gdt-mccqt">MCCQT: ${e(inv.invoiceCode)}</div>` : ''}
     </div>
     <div class="gdt-meta">
-      <div>Mẫu số: <b>${e(inv.template || '1')}</b></div>
-      <div>Ký hiệu: <b>${e(inv.series || '')}</b></div>
-      <div>Số: <span class="inv-no">${e(String(inv.number || '').padStart(7, '0'))}</span></div>
+      <div><b>Mẫu số</b> ${e(inv.template || '1')}</div>
+      <div><b>Ký hiệu:</b> ${e(inv.series || '')}</div>
+      <div><b>Số:</b> ${e(inv.number || '')}</div>
     </div>
   </div>
-  <div class="gdt-box"><div class="gdt-kv">
-    <span>Đơn vị bán hàng:</span><b>${e(inv.sellerName)}</b>
-    <span>Mã số thuế:</span><b>${e(inv.sellerTax)}</b>
-    <span>Địa chỉ:</span><span>${e(inv.sellerAddress)}</span>
-    ${inv.sellerPhone ? `<span>Điện thoại:</span><span>${e(inv.sellerPhone)}</span>` : ''}
-    ${inv.sellerBank ? `<span>Số tài khoản:</span><span>${e(inv.sellerBank)}</span>` : ''}
-  </div></div>
-  <div class="gdt-box" style="border-bottom:0;margin-bottom:4px"><div class="gdt-kv">
-    <span>Họ tên người mua hàng:</span><span>${e(inv.buyerContact || '')}</span>
-    <span>Tên đơn vị:</span><b>${e(inv.buyerName)}</b>
-    <span>Mã số thuế:</span><b>${e(inv.buyerTax)}</b>
-    <span>Địa chỉ:</span><span>${e(inv.buyerAddress)}</span>
-    <span>Hình thức thanh toán:</span><span>${e(inv.paymentMethod || '')} &nbsp;&nbsp; <i>Đơn vị tiền tệ:</i> ${e(inv.currency || 'VND')}${inv.exchangeRate && inv.exchangeRate !== 1 ? ` (Tỷ giá: ${fmtMoney(inv.exchangeRate)})` : ''}</span>
-  </div></div>
-  <table>
+
+  <div class="gdt-sec">
+    <div>Tên người bán: ${e(inv.sellerName)}</div>
+    <div>Mã số thuế: ${e(inv.sellerTax)}</div>
+    <div>Mã cửa hàng:</div>
+    <div>Tên cửa hàng:</div>
+    <div>Địa chỉ: ${e(inv.sellerAddress)}</div>
+    <div>Điện thoại: ${e(inv.sellerPhone || '')}</div>
+    <div>Số tài khoản: ${e(inv.sellerBank || '')}</div>
+  </div>
+
+  <div class="gdt-sec">
+    <div>Tên người mua: ${e(inv.buyerName)}</div>
+    <div>Họ tên người mua hàng: ${e(inv.buyerContact || '')}</div>
+    <div>Mã số thuế: ${e(inv.buyerTax)}</div>
+    <div>Mã ĐVCQHVNSNN:</div>
+    <div>CCCD người mua:</div>
+    <div>Số hộ chiếu:</div>
+    <div>Địa chỉ: ${e(inv.buyerAddress)}</div>
+    <div>Hình thức thanh toán: ${e(inv.paymentMethod || '')}</div>
+    <div>Số tài khoản:</div>
+    <div>Đơn vị tiền tệ: ${e(inv.currency || 'VND')}${inv.exchangeRate && inv.exchangeRate !== 1 ? ` &nbsp;&nbsp; Tỷ giá: ${fmtMoney(inv.exchangeRate)}` : ''}</div>
+    <div class="gdt-line"><span>Số bảng kê:</span><span>Ngày bảng kê:</span></div>
+  </div>
+
+  <table class="gdt-tbl">
     <thead>
-      <tr><th style="width:30px">STT</th><th>Tên hàng hóa, dịch vụ</th><th style="width:48px">ĐVT</th><th style="width:56px">Số lượng</th><th style="width:76px">Đơn giá</th><th style="width:86px">Thành tiền</th><th style="width:56px">Thuế suất</th><th style="width:76px">Tiền thuế</th></tr>
-      <tr class="gdt-colnum"><th>(1)</th><th>(2)</th><th>(3)</th><th>(4)</th><th>(5)</th><th>(6) = (4)x(5)</th><th>(7)</th><th>(8) = (6)x(7)</th></tr>
+      <tr>
+        <th style="width:26px">STT</th>
+        <th style="width:62px">Tính chất</th>
+        <th style="width:52px">Loại hàng hoá đặc trưng</th>
+        <th>Tên hàng hóa, dịch vụ</th>
+        <th style="width:42px">Đơn vị tính</th>
+        <th style="width:44px">Số lượng</th>
+        <th style="width:62px">Đơn giá</th>
+        <th style="width:50px">Chiết khấu</th>
+        <th style="width:42px">Thuế suất</th>
+        <th style="width:74px">Thành tiền chưa có thuế GTGT</th>
+      </tr>
     </thead>
-    <tbody>${rows}${breakdown}</tbody>
+    <tbody>${rows}</tbody>
   </table>
-  <table class="gdt-totals"><tbody>
-    <tr><td colspan="5" class="r"><b>Cộng tiền hàng:</b></td><td class="r" style="width:86px"><b>${fmtMoney(inv.net)}</b></td><td style="width:56px"></td><td class="r" style="width:76px"><b>${fmtMoney(inv.vat)}</b></td></tr>
-    <tr><td colspan="5" class="r"><b>Tổng cộng tiền thanh toán (${e(inv.currency || 'VND')}):</b></td><td class="r" colspan="3"><b>${fmtMoney(inv.total)}</b></td></tr>
-  </tbody></table>
-  <div class="words"><i>Số tiền viết bằng chữ:</i> <b>${e(inv.totalInWords || '')}</b></div>
+
+  <div class="gdt-summary">
+    <table>
+      <thead><tr><th>Thuế suất</th><th>Tổng tiền chưa thuế</th><th>Tổng tiền thuế</th></tr></thead>
+      <tbody>${rateRows}</tbody>
+    </table>
+    <table>
+      <tbody>
+        <tr><td>Tổng tiền chưa thuế (Tổng cộng thành tiền chưa có thuế)</td><td class="r" style="width:120px">${fmtMoney(inv.net)}</td></tr>
+        <tr><td>Tổng tiền thuế (Tổng cộng tiền thuế)</td><td class="r">${fmtMoney(inv.vat)}</td></tr>
+        <tr><td>Tổng tiền phí</td><td class="r"></td></tr>
+        <tr><td>Tổng tiền chiết khấu thương mại</td><td class="r">0</td></tr>
+        <tr><td>Tổng tiền thanh toán bằng số</td><td class="r"><b>${fmtMoney(inv.total)}</b></td></tr>
+        <tr><td>Tổng tiền thanh toán bằng chữ</td><td class="c">${e(inv.totalInWords || '')}</td></tr>
+      </tbody>
+    </table>
+  </div>
+
   <div class="gdt-signs">
-    <div><b>Người mua hàng</b><div style="font-style:italic;font-size:10.5px">(Chữ ký số (nếu có))</div></div>
-    <div><b>Người bán hàng</b><div style="font-style:italic;font-size:10.5px">(Ký, ghi rõ họ, tên)</div>${sigBox}</div>
+    <div><div>NGƯỜI MUA HÀNG</div><div style="font-style:italic;font-size:10px">(Chữ ký số (nếu có))</div></div>
+    <div><div>NGƯỜI BÁN HÀNG</div><div style="font-style:italic;font-size:10px">(Chữ ký điện tử, chữ ký số)</div>${sigBox}</div>
   </div>
-  <div class="foot">
-    <span>${inv.invoiceCode ? `Mã của cơ quan thuế: <b>${e(inv.invoiceCode)}</b>` : 'Hóa đơn điện tử không có mã của cơ quan thuế'}</span>
-    <span>Tra cứu tại: https://hoadondientu.gdt.gov.vn</span>
+  <div class="gdt-note-mid">(Cần kiểm tra, đối chiếu khi lập, nhận hóa đơn)</div>
+
+  <div class="gdt-foreign">
+    <h3>Thông tin quan trọng cho người nước ngoài</h3>
+    <ul>
+      <li>Bạn phải đáp ứng đầy đủ điều kiện tại Thông tư số 72/2014/TT-BTC ngày 30/05/2014; Thông tư số 92/2019/TT-BTC ngày 31/12/2019 sửa đổi, bổ sung Thông tư số 72/2014/TT-BTC của Bộ Tài Chính để được hoàn thuế GTGT;</li>
+      <li>Bạn phải làm thủ tục hoàn thuế trong vòng 60 ngày kể từ ngày mua hàng (kể từ ngày phát hành hóa đơn);</li>
+      <li>Bạn được hoàn thuế GTGT khi đi đường hàng không/đường biển tại sân bay quốc tế/cảng biển quốc tế.</li>
+    </ul>
   </div>
-</div></div></section>`;
+</div></section>`;
 }
 
 /** HTML bảng danh sách hóa đơn. */
