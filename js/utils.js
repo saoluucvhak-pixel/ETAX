@@ -302,7 +302,8 @@ export const b64decode = (b64) => Uint8Array.from(atob(b64), (c) => c.charCodeAt
 /** Chuyển mảng đối tượng thành CSV (có BOM UTF-8 để Excel đọc đúng tiếng Việt). */
 export function toCsv(columns, rows, delimiter = ',') {
   const esc = (v) => {
-    const s = v == null ? '' : String(v);
+    let s = v == null ? '' : String(v);
+    if (/^[=+\-@\t\r]/.test(s) && !/^-\d+(\.\d+)?$/.test(s)) s = `'${s}`;
     return /[",\n\r]/.test(s) || s.includes(delimiter) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   const lines = [columns.map((c) => esc(c.header)).join(delimiter)];

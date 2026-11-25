@@ -83,6 +83,7 @@ const TOAST_ICON = { ok: 'check', info: 'info', warn: 'alert', bad: 'alert' };
  * @param {{action?:{label:string,onClick:Function}, timeout?:number}} [opts]
  */
 export function toast(message, tone = 'info', opts = {}) {
+  if (typeof document === 'undefined') return () => {};
   if (!toastHost) { toastHost = h('div.toasts', { 'aria-live': 'polite' }); document.body.append(toastHost); }
   const close = () => { el.classList.add('leaving'); setTimeout(() => el.remove(), 180); };
   const el = h(`div.toast.tone-${tone}`, { role: tone === 'bad' ? 'alert' : 'status' },

@@ -37,7 +37,7 @@ export function start(runFn) {
       const r = await runFn({
         signal: ctrl.signal,
         onProgress: ({ pct, message, detail, count } = {}) => {
-          const p = pct ?? 0;
+          const p = pct ?? snapshot.pct;
           const elapsedMs = performance.now() - startedAt;
           // Tốc độ (hóa đơn/giây): cần ít nhất 1 giây trôi qua để không nhảy số lúc mới bắt đầu.
           const speed = count != null && elapsedMs > 1000 ? count / (elapsedMs / 1000) : null;
