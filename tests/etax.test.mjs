@@ -220,7 +220,9 @@ test('extension/manifest.json: valid MV3 manifest targeting gdt portal and 127.0
   assert.equal(mf.background?.service_worker, 'background.js');
   assert.ok(mf.host_permissions.includes('https://hoadondientu.gdt.gov.vn/*'));
   assert.ok(mf.host_permissions.includes('http://127.0.0.1:8080/*'));
-  assert.deepEqual(mf.content_scripts?.[0]?.js, ['content.js']);
+  assert.deepEqual(mf.content_scripts?.[0]?.js, ['hook.js']);
+  assert.equal(mf.content_scripts?.[0]?.world, 'MAIN');
+  assert.deepEqual(mf.content_scripts?.[1]?.js, ['content.js']);
 
   const pkg = JSON.parse(await readFile(path.join(ROOT, 'package.json'), 'utf8'));
   assert.equal(APP.version, pkg.version);

@@ -10,6 +10,16 @@
   let running = false;
   let cachedProfile = null;
   let cachedToken = '';
+  let cachedApiBase = '';
+
+  window.addEventListener('message', (ev) => {
+    if (ev.origin !== location.origin || ev.data?.type !== '__etax_portal_auth') return;
+    if (ev.data.token && ev.data.token !== cachedToken) {
+      cachedToken = ev.data.token;
+      cachedProfile = null;
+    }
+    if (ev.data.apiBase) cachedApiBase = ev.data.apiBase;
+  });
 
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -74,35 +84,51 @@
   }
 
   function getPortalToken() {
+    if (cachedToken) return cachedToken;
     const t = findJwtInStorage(localStorage) || findJwtInStorage(sessionStorage) || findJwtInCookie();
     if (t) cachedToken = t;
-    return t || cachedToken;
+    return t || '';
   }
 
   async function portalFetch(path, { timeoutMs = 45000, responseType = 'json' } = {}) {
     const token = getPortalToken();
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
-    try {
-      const prefix = location.port === '30000' ? '' : '/api';
-      const res = await fetch(`${location.origin}${prefix}${path}`, {
-        method: 'GET',
-        credentials: 'include',
-        signal: ctrl.signal,
-        headers: {
-          Accept: responseType === 'json' ? 'application/json' : '*/*',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-      });
-      if (!res.ok) {
-        const err = new Error(`HTTP ${res.status}`);
-        err.status = res.status;
-        throw err;
+    const candidates = cachedApiBase
+      ? [cachedApiBase]
+      : location.port === '30000'
+        ? [location.origin, 'https://hoadondientu.gdt.gov.vn/api']
+        : [`${location.origin}/api`, 'https://hoadondientu.gdt.gov.vn:30000'];
+
+    let lastErr;
+    for (const base of candidates) {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+      try {
+        const res = await fetch(`${base}${path}`, {
+          method: 'GET',
+          credentials: 'include',
+          signal: ctrl.signal,
+          headers: {
+            Accept: responseType === 'json' ? 'application/json' : '*/*',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        });
+        if (!res.ok) {
+          const err = new Error(`HTTP ${res.status}`);
+          err.status = res.status;
+          lastErr = err;
+          if (res.status === 401 || res.status === 403) throw err;
+          continue;
+        }
+        cachedApiBase = base;
+        return responseType === 'json' ? await res.json() : new Uint8Array(await res.arrayBuffer());
+      } catch (e) {
+        lastErr = e;
+        if (e.status === 401 || e.status === 403) throw e;
+      } finally {
+        clearTimeout(timer);
       }
-      return responseType === 'json' ? await res.json() : new Uint8Array(await res.arrayBuffer());
-    } finally {
-      clearTimeout(timer);
     }
+    throw lastErr || new Error('Không kết nối được API cổng Thuế');
   }
 
   async function fetchProfile() {
