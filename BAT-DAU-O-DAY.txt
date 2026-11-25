@@ -1,0 +1,32 @@
+ETAX MANAGER - CACH CHAY (KHONG CAN GO LENH, KHONG CAN BIET CMD)
+
+QUY TAC: MOI LAN CO BAN MOI, GIAI NEN VAO THU MUC MOI (KHONG GIAI NEN DE), CHAY OK THI XOA THU MUC CU.
+
+1. Giai nen: chuot phai file eTax.zip -> "Extract All..." -> Extract.
+   (Phai giai nen ra thu muc. KHONG bam dup file ben trong khi dang mo zip.)
+
+2. Vao thu muc vua giai nen, bam dup file  Chay-eTax.bat
+   - Lan dau tren may nay: can Internet, chuong trinh tu tai Node.js (khoang 30 MB, chi 1 lan, cho khoang 1 phut).
+   - NEU KHONG TU TAI DUOC hoac bao "Khong tim thay Node.js":
+       Cach A: noi mang roi bam dup lai Chay-eTax.bat
+       Cach B: cai Node.js thu cong:
+               1) Mo https://nodejs.org
+               2) Bam nut "LTS" (ban khuyen dung), tai file .msi ve
+               3) Bam dup file .msi, bam Next den het, Finish
+               4) Bam dup lai Chay-eTax.bat
+       Cach C: chep file node.exe (tai tu https://nodejs.org/en/download , muc Windows Binary .zip) vao thu muc "runtime"
+   - Cua so den hien ra, trinh duyet tu mo ung dung.
+   - Giu cua so den mo khi dang dung. Dung xong: dong cua so den la tat ung dung.
+
+3. Cai tien ich Chrome de dong bo tu cong Thue (lam 1 lan cho moi thu muc eTax moi):
+   a) Chrome: go chrome://extensions  (Edge: edge://extensions)
+   b) Xoa het cac tien ich eTax cu (neu co)
+   c) Bat "Che do nha phat trien" (goc tren ben phai)
+   d) Bam "Tai tien ich da giai nen" (Load unpacked) -> chon thu muc "extension" nam trong thu muc eTax vua giai nen
+   e) Phien ban phai hien 1.2.0
+
+Lan sau: chi can lam buoc 2.
+Sang may khac: giai nen eTax.zip o may do, lam buoc 2 va 3.
+Truoc khi chuyen may: vao ung dung > Cai dat > "Sao luu ngay" de mang theo du lieu.
+
+Neu Windows canh bao: chon "More info" roi "Run anyway".
