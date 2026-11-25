@@ -14,6 +14,7 @@ import { toast } from './core/ui.js';
 import { logger } from './logger.js';
 import { state } from './core/state.js';
 import { loadPdfLib, newDoc, drawInvoicePdf } from './core/pdfDoc.js';
+import { qrSvg, invoiceQrPayload } from './core/qr.js';
 import { fmtMoney, fmtDate, fmtDateTime, escapeHtml, toCsv, sanitizeFileName, todayISO, sum } from './utils.js';
 
 // ---------------------------------------------------------------- Cột chuẩn
@@ -189,7 +190,7 @@ export function invoiceHtml(inv) {
 
   return `<section class="page"><div class="gdt-sheet">
   <div class="gdt-head">
-    <div>${showStamp ? `<div class="stamp">${e(INVOICE_STATUS[inv.status]?.label || '')}</div>` : ''}</div>
+    <div style="display:flex;align-items:flex-start;gap:6px">${qrSvg(invoiceQrPayload(inv), 72)}${showStamp ? `<div class="stamp">${e(INVOICE_STATUS[inv.status]?.label || '')}</div>` : ''}</div>
     <div class="gdt-title">
       <h1>${e(inv.invoiceName || 'HOÁ ĐƠN GIÁ TRỊ GIA TĂNG')}</h1>
       <div class="gdt-date">${e(gdtDateWords(inv.date))}</div>
