@@ -82,7 +82,7 @@ export async function mount(host) {
     const params = {
       companyTax: state.companyTax, directions, mode, from: from.value, to: to.value, fallbackFrom: from.value, codeMode: codeMode.value,
       filters: { number: number.value.trim(), series: series.value.trim(), partnerTax: partnerTax.value.trim(), partnerName: partnerName.value.trim() },
-      withDetail: detail.checked && state.session?.mode !== 'bridge', pos: state.session?.mode === 'bridge' && pos.checked, xml: state.session?.mode === 'bridge' && xmlCk.checked,
+      withDetail: detail.checked && state.session?.mode !== 'bridge', pos: pos.checked, xml: state.session?.mode === 'bridge' && xmlCk.checked,
     };
     clear(resultBox);
     progress.set(0, 'Đang chuẩn bị…', '');
@@ -160,7 +160,7 @@ export async function mount(host) {
         h('div.form-grid', field('Theo số hóa đơn', number), field('Theo ký hiệu', series), field('Theo MST', partnerTax), field('Theo khách hàng / nhà cung cấp', partnerName))),
       state.session?.mode === 'bridge'
         ? h('div', { style: { display: 'grid', gap: '8px' } }, h('label.check', xmlCk, 'Tải kèm XML gốc và chi tiết hàng hóa (chậm hơn, khoảng 1 giây mỗi hóa đơn)'), h('label.check', pos, 'Lấy thêm hóa đơn khởi tạo từ máy tính tiền'), mstWarnBox, h('div.notice.info', icon('info', 18), h('div', 'Đang đồng bộ qua tiện ích trên trang Thuế: sau khi bấm Bắt đầu, giữ tab Thuế mở ở Tra cứu → Tra cứu hóa đơn. Tiện ích tự nhận lệnh và chạy; nếu bị cổng Thuế chặn thì tự dừng và báo ở đây.')))
-        : h('label.check', detail, 'Tải luôn chi tiết hàng hóa từng hóa đơn (đầy đủ hơn nhưng chậm hơn nhiều)'),
+        : h('div', { style: { display: 'grid', gap: '8px' } }, h('label.check', detail, 'Tải luôn chi tiết hàng hóa từng hóa đơn (đầy đủ hơn nhưng chậm hơn nhiều)'), h('label.check', pos, 'Lấy thêm hóa đơn khởi tạo từ máy tính tiền')),
       h('div.row-gap', startBtn, cancelBtn)));
 
   const side = h('div', { style: { display: 'grid', gap: '18px', alignContent: 'start' } },

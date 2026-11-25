@@ -75,7 +75,7 @@ export async function checkpointSync({ companyTax, direction, from, to, count, m
  * @param {(p:{pct:number,message:string,detail?:string})=>void} [o.onProgress]
  */
 export async function runSync(o) {
-  const { companyTax, directions, mode = 'range', codeMode = 'all', filters = {}, withDetail = false, signal, onProgress = () => {} } = o;
+  const { companyTax, directions, mode = 'range', codeMode = 'all', pos = false, filters = {}, withDetail = false, signal, onProgress = () => {} } = o;
   if (!canSync()) throw new Error('Cần đăng nhập (hoặc bật dữ liệu mẫu) trước khi đồng bộ.');
   if (!directions.length) throw new Error('Chưa chọn chiều hóa đơn (đầu vào / đầu ra).');
 
@@ -95,9 +95,9 @@ export async function runSync(o) {
       const label = DIRECTION_LABEL[direction];
       const counts = { fetched: 0, added: 0, updated: 0 };
       result.byDirection[direction] = counts;
-      await logger.info('sync', `Bắt đầu đồng bộ hóa đơn ${label.toLowerCase()} ${from} → ${to}`, { direction, from, to, mode, codeMode });
+      await logger.info('sync', `Bắt đầu đồng bộ hóa đơn ${label.toLowerCase()} ${from} → ${to}`, { direction, from, to, mode, codeMode, pos });
 
-      for await (const page of client.iterateInvoices({ direction, from, to, codeMode, ...filters, signal, onRetry: (i, delay, e) => report(undefined, `Lỗi tạm thời, thử lại lần ${i}…`, e.message) })) {
+      for await (const page of client.iterateInvoices({ direction, from, to, codeMode, pos, ...filters, signal, onRetry: (i, delay, e) => report(undefined, `Lỗi tạm thời, thử lại lần ${i}…`, e.message) })) {
         const invoices = page.items.map((raw) => fromGdtSummary(raw, { direction, companyTax }));
         if (state.session.mode === 'demo') invoices.forEach((x) => { x.source = 'demo'; });
         const r = await repos.invoices.upsertMany(invoices);

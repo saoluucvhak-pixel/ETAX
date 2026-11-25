@@ -7,7 +7,7 @@
 
 export const APP = Object.freeze({
   name: 'eTax Manager HAK Group',
-  version: '1.3.20',
+  version: '1.3.21',
   dbName: 'etax-manager',
   dbVersion: 1,
 });
@@ -27,6 +27,10 @@ export const GDT = Object.freeze({
     purchase: '/query/invoices/purchase',
     detail: '/query/invoices/detail',
     exportXml: '/query/invoices/export-xml',
+    scoSold: '/sco-query/invoices/sold',
+    scoPurchase: '/sco-query/invoices/purchase',
+    scoDetail: '/sco-query/invoices/detail',
+    scoExportXml: '/sco-query/invoices/export-xml',
   }),
   /** Số bản ghi mỗi trang khi gọi danh sách. */
   pageSize: 50,
