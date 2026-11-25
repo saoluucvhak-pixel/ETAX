@@ -109,12 +109,14 @@
           credentials: 'include',
           signal: ctrl.signal,
           headers: {
-            Accept: responseType === 'json' ? 'application/json' : '*/*',
+            Accept: responseType === 'json' ? 'application/json, text/plain, */*' : '*/*',
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
         });
         if (!res.ok) {
-          const err = new Error(`HTTP ${res.status} (${path.split('?')[0]})`);
+          const txt = await res.text().catch(() => '');
+          const snippet = txt.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120);
+          const err = new Error(`HTTP ${res.status} (${path.split('?')[0]})${snippet ? `: ${snippet}` : ''}`);
           err.status = res.status;
           lastErr = err;
           if (res.status === 401) throw err;
