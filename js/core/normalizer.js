@@ -98,6 +98,7 @@ export function fromGdtSummary(raw, { direction, companyTax }) {
     invoiceCode: raw.mhdon || '',
     codeStatus: codeStatusOf(raw.ttxly, raw.mhdon),
     paymentMethod: PAYMENT_METHOD[raw.thtttoan] || raw.thtttoan || '',
+    isPos: !!(raw._isPos || Number(raw.ttxly) === 8),
     taxBreakdown: breakdown,
   };
   // Cổng không trả breakdown → suy ra một dòng nếu tỷ lệ VAT/tiền chưa thuế khớp một thuế suất phổ biến

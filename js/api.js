@@ -305,30 +305,47 @@ export class GdtClient {
    * Duyệt danh sách hóa đơn theo từng đoạn ngày (mỗi đoạn ≤ 31 ngày) và từng trang.
    * @yields {{items:object[], chunk:[string,string], chunkIndex:number, chunkCount:number, total:number}}
    */
-  async* iterateInvoices({ direction, from, to, codeMode = 'all', number, series, partnerTax, partnerName, signal, onRetry }) {
-    const path = direction === DIRECTION.OUT ? GDT.paths.sold : GDT.paths.purchase;
+  async* iterateInvoices({ direction, from, to, codeMode = 'all', pos = false, number, series, partnerTax, partnerName, signal, onRetry }) {
+    const passes = [{ path: direction === DIRECTION.OUT ? GDT.paths.sold : GDT.paths.purchase, mode: codeMode, isPos: false }];
+    if (pos) passes.push({ path: direction === DIRECTION.OUT ? GDT.paths.scoSold : GDT.paths.scoPurchase, mode: 'all', isPos: true });
     const chunks = splitDateRange(from, to, GDT.maxRangeDays);
-    for (let ci = 0; ci < chunks.length; ci++) {
-      const [f, t] = chunks[ci];
-      const search = buildSearch({ from: f, to: t, direction, codeMode, number, series, partnerTax, partnerName });
-      let cursor = null;
-      let total = 0;
-      let guard = 0;
-      do {
-        if (signal?.aborted) throw new DOMException('Đã hủy', 'AbortError');
-        await this._throttle();
-        const res = await withRetry(async () => {
-          const r = await rawSend({ path, signal, headers: { ...this._auth(), Accept: 'application/json' }, query: { sort: GDT.sort, size: GDT.pageSize, search, ...(cursor ? { state: cursor } : {}) } });
-          checkStatus(r, 'Tải danh sách hóa đơn');
-          return r;
-        }, { signal, onRetry });
-        const j = decodeJson(res.bytes);
-        const items = j.datas || j.data || [];
-        total = j.total ?? total;
-        cursor = j.state || null;
-        yield { items, chunk: [f, t], chunkIndex: ci, chunkCount: chunks.length, total };
-        if (items.length < GDT.pageSize) cursor = null;
-      } while (cursor && ++guard < 2000);
+    for (const pass of passes) {
+      for (let ci = 0; ci < chunks.length; ci++) {
+        const [f, t] = chunks[ci];
+        const modes = pass.mode === 'all' ? ['all'] : [pass.mode];
+        for (let mi = 0; mi < modes.length; mi++) {
+          const search = buildSearch({ from: f, to: t, direction, codeMode: modes[mi], number, series, partnerTax, partnerName });
+          let cursor = null;
+          let total = 0;
+          let guard = 0;
+          try {
+            do {
+              if (signal?.aborted) throw new DOMException('Đã hủy', 'AbortError');
+              await this._throttle();
+              const res = await withRetry(async () => {
+                const r = await rawSend({ path: pass.path, signal, headers: { ...this._auth(), Accept: 'application/json' }, query: { sort: GDT.sort, size: GDT.pageSize, search, ...(cursor ? { state: cursor } : {}) } });
+                checkStatus(r, 'Tải danh sách hóa đơn');
+                return r;
+              }, { signal, onRetry });
+              const j = decodeJson(res.bytes);
+              const items = (j.datas || j.data || []).map((x) => (pass.isPos ? { ...x, _isPos: true } : x));
+              total = j.total ?? total;
+              cursor = j.state || null;
+              yield { items, chunk: [f, t], chunkIndex: ci, chunkCount: chunks.length, total };
+              if (items.length < GDT.pageSize) cursor = null;
+            } while (cursor && ++guard < 2000);
+          } catch (e) {
+            // Nếu cổng yêu cầu lọc ttxly riêng (khi mode='all' bị 400/500 ở lượt thường), tự tách sang coma + khongma
+            if (!pass.isPos && modes.length === 1 && modes[0] === 'all' && !(e instanceof AuthError) && e.name !== 'AbortError') {
+              modes.push('coma', 'khongma');
+              continue;
+            }
+            // Nếu cổng chưa bật /sco-query cho tài khoản này (403/404), bỏ qua lượt máy tính tiền thay vì làm hỏng cả lượt chính
+            if (pass.isPos && !(e instanceof AuthError) && e.name !== 'AbortError') break;
+            throw e;
+          }
+        }
+      }
     }
   }
 
@@ -338,23 +355,38 @@ export class GdtClient {
 
   /** Chi tiết một hóa đơn (hàng hóa, thuế suất…). */
   async detail(inv, signal) {
-    await this._throttle();
-    const res = await withRetry(async () => {
-      const r = await rawSend({ path: GDT.paths.detail, signal, headers: { ...this._auth(), Accept: 'application/json' }, query: this._detailQuery(inv) });
-      checkStatus(r, 'Tải chi tiết hóa đơn');
-      return r;
-    }, { signal });
-    return decodeJson(res.bytes);
+    const primary = inv.isPos ? GDT.paths.scoDetail : GDT.paths.detail;
+    const callDetail = async (path) => {
+      await this._throttle();
+      const res = await withRetry(async () => {
+        const r = await rawSend({ path, signal, headers: { ...this._auth(), Accept: 'application/json' }, query: this._detailQuery(inv) });
+        checkStatus(r, 'Tải chi tiết hóa đơn');
+        return r;
+      }, { signal });
+      return decodeJson(res.bytes);
+    };
+    try { return await callDetail(primary); } catch (e) {
+      if (inv.isPos && !(e instanceof AuthError) && e.name !== 'AbortError') return callDetail(GDT.paths.detail);
+      throw e;
+    }
   }
 
   /** Tải XML gốc của hóa đơn. Cổng thường trả về gói ZIP chứa file XML. */
   async xml(inv, signal) {
-    await this._throttle();
-    const res = await withRetry(async () => {
-      const r = await rawSend({ path: GDT.paths.exportXml, signal, headers: { ...this._auth() }, query: this._detailQuery(inv), timeoutMs: 90000 });
-      checkStatus(r, 'Tải XML hóa đơn');
-      return r;
-    }, { signal });
+    const primary = inv.isPos ? GDT.paths.scoExportXml : GDT.paths.exportXml;
+    const callXml = async (path) => {
+      await this._throttle();
+      return withRetry(async () => {
+        const r = await rawSend({ path, signal, headers: { ...this._auth() }, query: this._detailQuery(inv), timeoutMs: 90000 });
+        checkStatus(r, 'Tải XML hóa đơn');
+        return r;
+      }, { signal });
+    };
+    let res;
+    try { res = await callXml(primary); } catch (e) {
+      if (inv.isPos && !(e instanceof AuthError) && e.name !== 'AbortError') res = await callXml(GDT.paths.exportXml);
+      else throw e;
+    }
     if (looksLikeZip(res.bytes)) {
       const files = await unzip(res.bytes);
       const name = [...files.keys()].find((n) => /\.xml$/i.test(n));

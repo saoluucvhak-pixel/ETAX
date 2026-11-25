@@ -169,7 +169,11 @@
         if (attempt >= limit) break; // hết ngân sách thử lại cho đúng loại lỗi này — dừng thử ngay, không đợi thêm vô ích
         await sleep(Math.min(2500 * attempt, 20000)); continue;
       }
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      if (!r.ok) {
+        let detail = '';
+        try { const j = JSON.parse(head); detail = j.message || j.error || ''; } catch { detail = head.replace(/\s+/g, ' ').trim().slice(0, 140); }
+        throw new Error(`HTTP ${r.status}${detail ? `: ${detail}` : ''}`);
+      }
       if (binary) return buf;
       try { return JSON.parse(new TextDecoder().decode(buf)); } catch { throw new Stop('Cổng Thuế trả về dữ liệu không phải JSON (có thể đang bảo trì).'); }
     }
@@ -287,8 +291,9 @@
    * rồi làm tiếp, thay vì để lỗi lan ra làm mất luôn kết quả của các mã đã chạy tốt. Không truyền callback này (chế độ thủ
    * công) thì hành vi giữ y hệt trước đây: lỗi bận vẫn dừng toàn bộ, không đổi. */
   async function listRange({ dirKey, from, to, codes, onPage, viaEtax = false, onCodeBusy }) {
-    const dir = DIRS[dirKey]; const parts = chunks(from, to); const total = parts.length * codes.length; let step = 0;
-    for (const code of codes) {
+    const dir = DIRS[dirKey]; const parts = chunks(from, to); const queue = [...codes]; const total = parts.length * queue.length; let step = 0;
+    for (let ci = 0; ci < queue.length; ci++) {
+      const code = queue[ci];
       const codeStartStep = step; // mốc step lúc bắt đầu mã này — dùng để nhảy đúng sang mã kế tiếp nếu mã này bị bỏ qua
       try {
         for (const [f, t] of parts) {
@@ -305,13 +310,32 @@
           step++;
         }
       } catch (e) {
+        if (e instanceof Stop && !e.busy) throw e;
+        // Bán ra không lọc ttxly bị cổng từ chối (HTTP 400/500) → tự thử tách lần lượt Đã cấp mã (5) + Không mã (6)
+        if (dirKey === 'out' && queue.length === 1 && code === '' && !(e instanceof Stop)) {
+          queue.push('5', '6');
+          continue;
+        }
+        // Máy tính tiền (/api/sco-query) chưa bật hoặc tạm lỗi ở chế độ bridge → bỏ qua phần POS để không mất phần chính
+        if (dir.pos && onCodeBusy) { step = codeStartStep + parts.length; await onCodeBusy('pos', e); continue; }
         if (e instanceof Stop && e.busy && onCodeBusy) { step = codeStartStep + parts.length; await onCodeBusy(code, e); continue; }
         throw e;
       }
     }
   }
 
-  const xmlUrl = (it, dir) => `${location.origin}/api/${dir?.api || 'query'}/invoices/export-xml?nbmst=${encodeURIComponent(it.nbmst)}&khhdon=${encodeURIComponent(it.khhdon)}&shdon=${encodeURIComponent(it.shdon)}&khmshdon=${encodeURIComponent(it.khmshdon)}`;
+  const xmlUrl = (it, dir) => `${location.origin}/api/${dir?.api || 'query'}/invoices/export-xml?nbmst=${encodeURIComponent(it.nbmst ?? '')}&khhdon=${encodeURIComponent(it.khhdon ?? '')}&shdon=${encodeURIComponent(it.shdon ?? '')}&khmshdon=${encodeURIComponent(it.khmshdon ?? '')}`;
+
+  async function fetchXmlBuf(it, dir, viaEtax = false) {
+    try {
+      return await call(xmlUrl(it, dir), `Xuất xml (${dir.label})`, true, viaEtax);
+    } catch (e) {
+      if (dir?.api === 'sco-query' && !(e instanceof Stop)) {
+        return await call(xmlUrl(it, { ...dir, api: 'query' }), `Xuất xml (${dir.label})`, true, viaEtax);
+      }
+      throw e;
+    }
+  }
 
   /** Lấy nội dung XML hóa đơn từ gói cổng trả về (thường là ZIP có XML + HTML). */
   async function xmlFromZip(buf) {
@@ -477,7 +501,7 @@
           const it = listed[i];
           if (i % 10 === 0 && (await jobGone(job))) throw new Stop('Lệnh đồng bộ đã bị hủy trong eTax Manager.');
           try {
-            const idir = DIRS[it.dk] || dir; const x = await xmlFromZip(await call(xmlUrl(it, idir), `Xuất xml (${idir.label})`, true, true));
+            const idir = DIRS[it.dk] || dir; const x = await xmlFromZip(await fetchXmlBuf(it, idir, true));
             if (!x) throw new Error('không thấy XML trong gói');
             const sent = await bridge('POST', 'data', { jobId: job.id, direction: job.direction, kind: 'xml', items: [{ key: it.key, name: `${safe(it.khhdon)}_${safe(it.shdon)}.xml`, xml: x.text }] });
             if (!sent.ok) throw new Stop(sent.error || 'Không gửi được dữ liệu về eTax Manager.');
