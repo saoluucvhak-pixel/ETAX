@@ -33,8 +33,8 @@
     in: { path: 'purchase', label: 'hóa đơn mua vào', folder: 'Mua_vao', name: 'Mua vào' },
     out: { path: 'sold', label: 'hóa đơn bán ra', folder: 'Ban_ra', name: 'Bán ra' },
     // Hóa đơn khởi tạo từ máy tính tiền: cùng cách gọi nhưng dưới /api/sco-query, không lọc "kết quả kiểm tra" (đo trên cổng thật 20/09/2026)
-    in_pos: { path: 'purchase', api: 'sco-query', pos: true, label: 'hóa đơn máy tính tiền mua vào', folder: 'Mua_vao_may_tinh_tien', name: 'Mua vào (máy tính tiền)' },
-    out_pos: { path: 'sold', api: 'sco-query', pos: true, label: 'hóa đơn máy tính tiền bán ra', folder: 'Ban_ra_may_tinh_tien', name: 'Bán ra (máy tính tiền)' },
+    in_pos: { path: 'purchase', api: 'sco-query', pos: true, label: 'hóa đơn mua vào', folder: 'Mua_vao_may_tinh_tien', name: 'Mua vào (máy tính tiền)' },
+    out_pos: { path: 'sold', api: 'sco-query', pos: true, label: 'hóa đơn bán ra', folder: 'Ban_ra_may_tinh_tien', name: 'Bán ra (máy tính tiền)' },
   };
   const TTHAI = { 1: 'Hóa đơn mới', 2: 'Hóa đơn thay thế', 3: 'Hóa đơn điều chỉnh', 4: 'Đã bị thay thế', 5: 'Đã bị điều chỉnh', 6: 'Đã bị hủy' };
   const TTXLY = { 5: 'Đã cấp mã hóa đơn', 6: 'Đã nhận - không mã', 8: 'Đã nhận - khởi tạo từ máy tính tiền' };
@@ -132,49 +132,120 @@
   // biến mất ngay khi lỗi) — phải chỉ đúng chỗ làm tiếp thật: nút "Bắt đầu đồng bộ" trong eTax Manager.
   const ETAX_RETRY = 'tiến độ đã liệt kê được giữ lại, bấm "Bắt đầu đồng bộ" trong eTax Manager để làm tiếp.';
   // Hỗ trợ nhập CAPTCHA khi Cổng Thuế yêu cầu mã xác thực cho hóa đơn máy tính tiền (sco-query)
-  function promptCaptcha(key, imgData) {
+  function promptCaptcha(initialKey, initialImgData, errorMsg = '') {
     return new Promise((resolve) => {
+      let curKey = initialKey;
       const box = document.createElement('div');
-      box.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.55);z-index:999999;display:flex;align-items:center;justify-content:center;font-family:sans-serif;';
+      box.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:999999;display:flex;align-items:center;justify-content:center;font-family:system-ui,-apple-system,sans-serif;';
       const panel = document.createElement('div');
-      panel.style.cssText = 'background:#fff;border-radius:10px;padding:20px 24px;max-width:380px;width:90%;box-shadow:0 8px 30px rgba(0,0,0,0.3);text-align:center;';
-      const isSvg = /^\s*</.test(imgData);
-      const imgHtml = isSvg
-        ? `<div style="display:inline-flex;align-items:center;justify-content:center;height:44px;border:1px solid #cbd5e1;border-radius:6px;padding:2px 8px;background:#f8fafc;vertical-align:middle;overflow:hidden;">${imgData}</div>`
-        : `<img src="${imgData}" style="height:44px;border:1px solid #cbd5e1;border-radius:6px;vertical-align:middle;" />`;
-      panel.innerHTML = `<h3 style="margin:0 0 10px;font-size:16px;color:#1e293b;">Mã xác thực Cổng Thuế</h3>
-        <p style="font-size:12.5px;color:#64748b;margin:0 0 12px;line-height:1.4;">Cổng Thuế yêu cầu mã xác thực để tra cứu hóa đơn máy tính tiền (POS). Vui lòng nhập mã trong ảnh:</p>
-        <div style="margin:10px 0;">${imgHtml}</div>
-        <input type="text" id="__cval" placeholder="Nhập mã xác thực" maxlength="8" style="width:100%;box-sizing:border-box;padding:8px 12px;font-size:16px;letter-spacing:2px;font-weight:600;text-transform:uppercase;text-align:center;border:1.5px solid #2b3a8c;border-radius:6px;margin:8px 0 14px;" />
-        <div style="display:flex;gap:8px;justify-content:center;">
-          <button id="__cbtn" style="padding:8px 18px;background:#2b3a8c;color:#fff;border:none;border-radius:6px;font-weight:600;cursor:pointer;">Xác nhận</button>
-          <button id="__cskip" style="padding:8px 18px;background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;border-radius:6px;cursor:pointer;">Bỏ qua</button>
-        </div>`;
+      panel.style.cssText = 'background:#fff;border-radius:12px;padding:24px 28px;max-width:400px;width:92%;box-shadow:0 12px 40px rgba(0,0,0,0.35);text-align:center;box-sizing:border-box;';
+
+      const renderImg = (data) => {
+        const isSvg = /^\s*</.test(data);
+        return isSvg
+          ? `<div id="__cimg_wrap" style="display:inline-flex;align-items:center;justify-content:center;height:48px;border:1px solid #cbd5e1;border-radius:8px;padding:2px 10px;background:#f8fafc;vertical-align:middle;overflow:hidden;">${data}</div>`
+          : `<img id="__cimg_wrap" src="${data}" style="height:48px;border:1px solid #cbd5e1;border-radius:8px;vertical-align:middle;" />`;
+      };
+
+      const errHtml = errorMsg ? `<div id="__cerr_msg" style="color:#dc2626;font-size:12.5px;font-weight:600;margin-bottom:10px;">${errorMsg}</div>` : '<div id="__cerr_msg" style="display:none;"></div>';
+
+      panel.innerHTML = `
+        <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:8px;">
+          <span style="font-size:22px;">🔐</span>
+          <h3 style="margin:0;font-size:17px;color:#1e293b;font-weight:700;">Mã xác thực Cổng Thuế (POS)</h3>
+        </div>
+        <p style="font-size:13px;color:#64748b;margin:0 0 12px;line-height:1.45;">Cổng Thuế yêu cầu mã xác thực để tra cứu hóa đơn máy tính tiền:</p>
+        ${errHtml}
+        <div style="display:flex;align-items:center;justify-content:center;gap:10px;margin:12px 0;">
+          <div id="__ccontainer">${renderImg(initialImgData)}</div>
+          <button id="__creload" type="button" title="Đổi mã khác" style="background:#f1f5f9;border:1px solid #cbd5e1;border-radius:6px;padding:8px 10px;cursor:pointer;font-size:14px;color:#475569;">🔄</button>
+        </div>
+        <input type="text" id="__cval" placeholder="Nhập 6 ký tự mã" maxlength="8" autocomplete="off" style="width:100%;box-sizing:border-box;padding:10px 12px;font-size:18px;letter-spacing:3px;font-weight:700;text-transform:uppercase;text-align:center;border:2px solid #2b3a8c;border-radius:8px;margin:8px 0 16px;outline:none;" />
+        <div style="display:flex;gap:10px;justify-content:center;">
+          <button id="__cbtn" type="button" style="flex:1;padding:10px 18px;background:#2b3a8c;color:#fff;border:none;border-radius:8px;font-weight:600;font-size:14px;cursor:pointer;">Xác nhận</button>
+          <button id="__cskip" type="button" style="padding:10px 18px;background:#f8fafc;color:#64748b;border:1px solid #cbd5e1;border-radius:8px;font-size:14px;cursor:pointer;">Bỏ qua</button>
+        </div>
+      `;
       box.appendChild(panel);
       document.body.appendChild(box);
+
       const inp = panel.querySelector('#__cval');
       inp.focus();
-      const done = (val) => { box.remove(); resolve(val); };
+
+      // Thông báo âm thanh nhẹ và đổi title để người dùng ở cửa sổ khác dễ nhận biết
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const g = ctx.createGain();
+        osc.connect(g); g.connect(ctx.destination);
+        osc.frequency.value = 750;
+        g.gain.setValueAtTime(0.2, ctx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
+        osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.35);
+      } catch { /* bỏ qua nếu trình duyệt chặn âm thanh tự động */ }
+
+      const oldTitle = document.title;
+      document.title = '🔐 [Nhập mã xác thực] ' + oldTitle;
+
+      const done = (val) => {
+        document.title = oldTitle;
+        box.remove();
+        resolve(val ? { key: curKey, code: val } : null);
+      };
+
       panel.querySelector('#__cbtn').addEventListener('click', () => done(inp.value.trim()));
       panel.querySelector('#__cskip').addEventListener('click', () => done(null));
-      inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') done(inp.value.trim()); else if (e.key === 'Escape') done(null); });
+      inp.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') done(inp.value.trim());
+        else if (e.key === 'Escape') done(null);
+      });
+
+      panel.querySelector('#__creload').addEventListener('click', async () => {
+        panel.querySelector('#__creload').disabled = true;
+        try {
+          const fresh = await fetchCaptchaData();
+          if (fresh) {
+            curKey = fresh.key;
+            panel.querySelector('#__ccontainer').innerHTML = renderImg(fresh.imgData);
+            inp.value = '';
+            inp.focus();
+          }
+        } finally {
+          panel.querySelector('#__creload').disabled = false;
+        }
+      });
     });
   }
 
-  async function getFreshCaptcha() {
+  async function fetchCaptchaData() {
+    const token = findToken();
+    const hdrs = {
+      Accept: 'application/json, text/plain, */*',
+      'Accept-Language': 'vi',
+      'request-id': crypto.randomUUID(),
+    };
+    if (token) hdrs.Authorization = `Bearer ${token}`;
     for (const p of ['/api/captcha', '/captcha']) {
       try {
-        const res = await fetch(`${location.origin}${p}`, { headers: { Accept: 'application/json' }, credentials: 'same-origin' });
+        const res = await fetch(`${location.origin}${p}`, { headers: hdrs, credentials: 'same-origin' });
         if (!res.ok) continue;
-        const j = await res.json();
-        if (!j || !j.key) continue;
-        const raw = j.content || j.image || '';
+        const text = await res.text();
+        let j = null;
+        try { j = JSON.parse(text); } catch { /* text */ }
+        const key = j?.key || '';
+        const raw = j?.content || j?.image || text || '';
+        if (!key) continue;
         const imgData = /^\s*</.test(raw) ? raw : (raw.startsWith('data:') ? raw : `data:image/png;base64,${raw}`);
-        const code = await promptCaptcha(j.key, imgData);
-        return code ? { key: j.key, code } : null;
-      } catch { /* thử đường dẫn kế tiếp */ }
+        return { key, imgData };
+      } catch { /* tiếp tục */ }
     }
     return null;
+  }
+
+  async function getFreshCaptcha(errorMsg = '') {
+    const data = await fetchCaptchaData();
+    if (!data) return null;
+    return await promptCaptcha(data.key, data.imgData, errorMsg);
   }
 
   async function call(url, label, binary = false, viaEtax = false) {
@@ -204,13 +275,13 @@
       const head = buf.byteLength < 8192 ? new TextDecoder().decode(buf) : '';
       if (isBlocked(head)) throw new Stop('Cổng Thuế đã chặn yêu cầu (chống truy cập tự động). Tiện ích DỪNG và giữ tiến độ, không thử cách khác. Hãy chờ một lúc, hoặc dùng nút xuất Excel/XML thủ công của trang Thuế.');
       if (r.status === 401 || r.status === 403) throw new Stop(viaEtax ? `Phiên đăng nhập hết hạn hoặc bị từ chối. Hãy đăng nhập lại trên trang Thuế — ${ETAX_RETRY}` : 'Phiên đăng nhập hết hạn hoặc bị từ chối. Hãy đăng nhập lại trên trang này rồi bấm "Tiếp tục".');
-      if (r.status === 400) {
+      if (r.status === 400 || (r.status === 500 && activeUrl.includes('/sco-query/'))) {
         const isRange = /khoảng ngày|ngày|giới hạn/i.test(head);
         const isCaptcha = /captcha|xác thực|ckey|cvalue|bảo mật|mã/i.test(head) || activeUrl.includes('/sco-query/');
         if (!isRange && isCaptcha) {
-          const c = await getFreshCaptcha();
+          const c = await getFreshCaptcha('Mã xác thực không đúng hoặc đã hết hạn. Vui lòng nhập lại:');
           if (c) {
-            const cleanUrl = url.replace(/[?&]ckey=[^&]*/g, '').replace(/[?&]cvalue=[^&]*/g, '');
+            const cleanUrl = activeUrl.replace(/[?&]ckey=[^&]*/g, '').replace(/[?&]cvalue=[^&]*/g, '');
             const sep = cleanUrl.includes('?') ? '&' : '?';
             activeUrl = `${cleanUrl}${sep}ckey=${encodeURIComponent(c.key)}&cvalue=${encodeURIComponent(c.code)}`;
             continue;
@@ -365,7 +436,19 @@
           const search = `tdlap=ge=${portalDate(f)};tdlap=le=${portalDate(t, true)}${code ? `;ttxly==${code}` : ''}`;
           try {
             do {
-              const url = `${location.origin}/api/${dir.api || 'query'}/invoices/${dir.path}?sort=tdlap:desc&size=${PAGE_SIZE}${cursor ? `&state=${cursor}` : ''}&search=${search}`;
+              let url = `${location.origin}/api/${dir.api || 'query'}/invoices/${dir.path}?sort=tdlap:desc&size=${PAGE_SIZE}${cursor ? `&state=${cursor}` : ''}&search=${search}`;
+              if (dir.pos) {
+                if (beat) beat('Cổng Thuế yêu cầu mã xác thực (POS). Vui lòng chuyển sang tab Cổng Thuế để nhập mã.');
+                const c = await getFreshCaptcha();
+                if (!c) {
+                  if (onCodeBusy) {
+                    await onCodeBusy('pos', new Error('Đã bỏ qua nhập mã xác thực máy tính tiền'));
+                    return;
+                  }
+                  throw new Stop('Bạn đã hủy nhập mã xác thực Cổng Thuế.');
+                }
+                url += `&ckey=${encodeURIComponent(c.key)}&cvalue=${encodeURIComponent(c.code)}`;
+              }
               const page = await call(url, `Tìm kiếm (${dir.label})`, false, viaEtax);
               const items = page.datas || [];
               await onPage(items, { f, t, step, total: curPeriodList.length * queue.length, code });

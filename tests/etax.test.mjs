@@ -270,6 +270,9 @@ test('extension/content.js: chunks function accepts maxDays parameter and handle
   const content = await readFile(path.join(ROOT, 'extension', 'content.js'), 'utf8');
   assert.match(content, /function chunks\(from,\s*to,\s*maxDays\s*=\s*MAX_DAYS\)/);
   assert.match(content, /\/api\/captcha/);
+  assert.match(content, /fetchCaptchaData/);
+  assert.match(content, /__creload/);
+  assert.match(content, /activeUrl\.includes\('\/sco-query\/'\)/);
 
   const ranges10 = splitDateRange('2026-11-01', '2026-11-25', 10);
   assert.equal(ranges10.length, 3);
